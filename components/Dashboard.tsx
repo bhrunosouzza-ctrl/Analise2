@@ -59,12 +59,27 @@ export const Dashboard: React.FC = () => {
     const analytics = useMemo(() => calculateAnalytics(filteredData, goals), [filteredData, goals]);
 
     const options = useMemo(() => {
-        const getUnique = (key: string) => ['Todos', ...new Set(rawData.map(item => item[key]).filter(Boolean))].sort();
+        // Helper para pegar valores únicos e remover nulos/vazios, sem adicionar 'Todos' aqui
+        const getUnique = (key: string) => [...new Set(rawData.map(item => item[key]).filter(Boolean))];
+        
+        const monthOrder = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+
         return {
-            supervisores: getUnique('Supervisor'),
-            agentes: getUnique('Agente'),
-            ciclos: getUnique('Ciclo'),
-            meses: getUnique('Mes')
+            supervisores: getUnique('Supervisor').sort(),
+            agentes: getUnique('Agente').sort(),
+            ciclos: getUnique('Ciclo').sort(),
+            // Ordenação cronológica dos meses com Indefinido no final
+            meses: getUnique('Mes').sort((a: any, b: any) => {
+                const idxA = monthOrder.indexOf(a);
+                const idxB = monthOrder.indexOf(b);
+                // Se não encontrar (idx = -1), joga pro final (peso 999)
+                const weightA = idxA === -1 ? 999 : idxA;
+                const weightB = idxB === -1 ? 999 : idxB;
+                return weightA - weightB;
+            })
         };
     }, [rawData]);
 

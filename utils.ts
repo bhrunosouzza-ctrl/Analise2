@@ -18,18 +18,42 @@ export const parseExcelDate = (serial: number | string): { mes: string; dataForm
 
   if (typeof serial === 'number') {
     // Excel date serial conversion
-    const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+    // Adicionamos um buffer de 12 horas para evitar erros de arredondamento de fuso horário
+    // que poderiam jogar a data para o dia anterior (ex: 23:59:59)
+    const date = new Date(Math.round((serial - 25569) * 86400 * 1000) + 12 * 3600 * 1000);
     mes = date.toLocaleString('pt-BR', { month: 'long' });
     dataFormatada = date.toISOString().split('T')[0];
-  } else {
-    try {
-      const date = new Date(serial);
-      if (!isNaN(date.getTime())) {
+  } else if (typeof serial === 'string') {
+    // Tenta formato DD/MM/AAAA ou DD-MM-AAAA comum no Brasil
+    const ptDateRegex = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/;
+    const match = serial.match(ptDateRegex);
+
+    if (match) {
+        const day = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1; // JS months are 0-11
+        const year = parseInt(match[3], 10);
+        const date = new Date(year, month, day);
         mes = date.toLocaleString('pt-BR', { month: 'long' });
-        dataFormatada = date.toISOString().split('T')[0];
-      }
-    } catch (e) {
-      console.warn("Date parse error", e);
+        // Formatação manual ISO segura
+        dataFormatada = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    } else {
+        // Fallback para o parser padrão
+        try {
+            // Se for string ISO YYYY-MM-DD, forçar interpretação local adicionando hora segura
+            // Evita que new Date("2024-02-01") seja lido como UTC e vire 31/Jan no Brasil
+            let dateStr = serial;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(serial)) {
+                dateStr += 'T12:00:00';
+            }
+            
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+                mes = date.toLocaleString('pt-BR', { month: 'long' });
+                dataFormatada = date.toISOString().split('T')[0];
+            }
+        } catch (e) {
+            console.warn("Date parse error", e);
+        }
     }
   }
 
