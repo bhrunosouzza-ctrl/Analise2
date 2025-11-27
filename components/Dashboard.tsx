@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
@@ -5,17 +6,18 @@ import {
 } from 'recharts';
 import { 
   UploadCloud, BarChart2, Target, Briefcase, Droplet, 
-  TrendingUp, Home, Users, AlertTriangle, ClipboardList, PieChart as PieIcon 
+  TrendingUp, Home, Users, AlertTriangle, ClipboardList, PieChart as PieIcon, MapPin, FileText 
 } from 'lucide-react';
 import { ProductionData, FilterState, GoalSettings } from '../types';
 import { processDataFile, calculateAnalytics, COLORS } from '../utils';
 import { KpiCard } from './KpiCard';
 import { GoalModal } from './GoalModal';
+import { generatePDFReport } from './ReportGenerator';
 
 export const Dashboard: React.FC = () => {
     const [rawData, setRawData] = useState<ProductionData[]>([]);
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'property' | 'teams' | 'issues'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'property' | 'teams' | 'issues' | 'neighborhoods'>('overview');
     const [showGoalModal, setShowGoalModal] = useState(false);
 
     const [goals, setGoals] = useState<GoalSettings>({
@@ -59,7 +61,6 @@ export const Dashboard: React.FC = () => {
     const analytics = useMemo(() => calculateAnalytics(filteredData, goals), [filteredData, goals]);
 
     const options = useMemo(() => {
-        // Helper para pegar valores únicos e remover nulos/vazios, sem adicionar 'Todos' aqui
         const getUnique = (key: string) => [...new Set(rawData.map(item => item[key]).filter(Boolean))];
         
         const monthOrder = [
@@ -71,11 +72,9 @@ export const Dashboard: React.FC = () => {
             supervisores: getUnique('Supervisor').sort(),
             agentes: getUnique('Agente').sort(),
             ciclos: getUnique('Ciclo').sort(),
-            // Ordenação cronológica dos meses com Indefinido no final
             meses: getUnique('Mes').sort((a: any, b: any) => {
                 const idxA = monthOrder.indexOf(a);
                 const idxB = monthOrder.indexOf(b);
-                // Se não encontrar (idx = -1), joga pro final (peso 999)
                 const weightA = idxA === -1 ? 999 : idxA;
                 const weightB = idxB === -1 ? 999 : idxB;
                 return weightA - weightB;
@@ -91,6 +90,10 @@ export const Dashboard: React.FC = () => {
             d.Pendencias !== '0'
         );
     }, [filteredData]);
+
+    const handleExportPDF = () => {
+        generatePDFReport(analytics, pendenciasList, filters);
+    };
 
     if (rawData.length === 0) {
         return (
@@ -114,10 +117,15 @@ export const Dashboard: React.FC = () => {
         );
     }
 
-    // Chart styling constants
     const CHART_GRID_COLOR = "#334155";
     const CHART_TEXT_COLOR = "#94a3b8";
     const TOOLTIP_STYLE = { backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)' };
+
+    const getCoverageColor = (percent: number) => {
+        if (percent >= 80) return 'bg-green-500';
+        if (percent >= 60) return 'bg-yellow-500';
+        return 'bg-red-500';
+    };
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
@@ -138,6 +146,13 @@ export const Dashboard: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-3 w-full xl:w-auto items-center justify-end">
+                        <button 
+                            onClick={handleExportPDF}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-lg border border-slate-700 flex items-center gap-2 text-sm font-medium transition-colors"
+                        >
+                            <FileText size={16} /> Relatório PDF
+                        </button>
+
                         {['Supervisor', 'Agente', 'Ciclo', 'Mes'].map(filterKey => (
                             <div key={filterKey} className="relative">
                                 <select 
@@ -150,15 +165,11 @@ export const Dashboard: React.FC = () => {
                                         <option key={opt} value={opt}>{opt}</option>
                                     ))}
                                 </select>
-                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                </div>
                             </div>
                         ))}
                         <button 
                             onClick={() => setShowGoalModal(true)} 
                             className="p-2.5 text-slate-400 hover:bg-slate-800 hover:text-blue-400 rounded-lg transition-colors border border-transparent hover:border-slate-700" 
-                            title="Configurar Metas"
                         >
                             <Target size={20} />
                         </button>
@@ -169,11 +180,12 @@ export const Dashboard: React.FC = () => {
             {/* Navigation Tabs */}
             <div className="bg-slate-900 border-b border-slate-800 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
+                    <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
                         {[
                             { id: 'overview', label: 'Visão Geral', icon: BarChart2 },
                             { id: 'quality', label: 'Qualidade', icon: Droplet },
                             { id: 'property', label: 'Imóveis', icon: Home },
+                            { id: 'neighborhoods', label: 'Bairros', icon: MapPin },
                             { id: 'teams', label: 'Equipes', icon: Users },
                             { id: 'issues', label: 'Pendências', icon: AlertTriangle, count: pendenciasList.length }
                         ].map(tab => (
@@ -205,38 +217,13 @@ export const Dashboard: React.FC = () => {
                 {activeTab === 'overview' && (
                     <div className="space-y-6 animate-in fade-in duration-500">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                            <KpiCard 
-                                title="Trabalhados" 
-                                value={analytics.totalTrabalhados.toLocaleString()} 
-                                sub={`Meta: ${(analytics.rankingAgentes.length * goals.trabalhados).toLocaleString()}`} 
-                                icon={Briefcase} 
-                                color="blue" 
-                            />
-                            <KpiCard 
-                                title="Média Diária" 
-                                value={analytics.mediaDiaria} 
-                                sub={`Alvo: ${goals.diariaMin}-${goals.diariaMax}`} 
-                                icon={TrendingUp} 
-                                color={parseFloat(analytics.mediaDiaria) >= goals.diariaMin ? 'green' : 'red'} 
-                            />
-                            <KpiCard 
-                                title="Eficiência" 
-                                value={`${analytics.percTrabalhados.toFixed(1)}%`} 
-                                sub={`Perda: ${analytics.percPerda.toFixed(1)}%`} 
-                                icon={PieIcon} 
-                                color={analytics.percTrabalhados >= goals.eficienciaMin ? 'green' : 'orange'} 
-                            />
-                            <KpiCard 
-                                title="Imóveis Fechados" 
-                                value={analytics.totalFechados.toLocaleString()} 
-                                sub={`Recusas: ${analytics.totalRecusas.toLocaleString()}`} 
-                                icon={Home} 
-                                color="slate" 
-                            />
+                            <KpiCard title="Trabalhados" value={analytics.totalTrabalhados.toLocaleString()} sub={`Meta: ${(analytics.rankingAgentes.length * goals.trabalhados).toLocaleString()}`} icon={Briefcase} color="blue" />
+                            <KpiCard title="Média Diária" value={analytics.mediaDiaria} sub={`Alvo: ${goals.diariaMin}-${goals.diariaMax}`} icon={TrendingUp} color={parseFloat(analytics.mediaDiaria) >= goals.diariaMin ? 'green' : 'red'} />
+                            <KpiCard title="Eficiência" value={`${analytics.percTrabalhados.toFixed(1)}%`} sub={`Perda: ${analytics.percPerda.toFixed(1)}%`} icon={PieIcon} color={analytics.percTrabalhados >= goals.eficienciaMin ? 'green' : 'orange'} />
+                            <KpiCard title="Imóveis Fechados" value={analytics.totalFechados.toLocaleString()} sub={`Recusas: ${analytics.totalRecusas.toLocaleString()}`} icon={Home} color="slate" />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-                             {/* Ranking Column */}
                             <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 flex flex-col overflow-hidden h-full">
                                 <div className="p-4 border-b border-slate-800 bg-slate-800/50 flex justify-between items-center backdrop-blur-sm">
                                     <h3 className="font-bold text-slate-100">Ranking Produtividade</h3>
@@ -255,40 +242,21 @@ export const Dashboard: React.FC = () => {
                                                 <span className={`text-sm font-bold font-mono ${agent.StatusMeta ? 'text-green-400' : 'text-slate-500'}`}>{agent.Trabalhados}</span>
                                             </div>
                                             <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-700/50">
-                                                <div 
-                                                    className={`h-full rounded-full transition-all duration-500 ${agent.StatusMeta ? 'bg-green-500' : 'bg-blue-500'}`} 
-                                                    style={{width: `${Math.min(100, (agent.Trabalhados / goals.trabalhados) * 100)}%`}}
-                                                ></div>
-                                            </div>
-                                            <div className="flex justify-between mt-1.5 text-[10px] text-slate-500 font-medium uppercase tracking-wide">
-                                                <span>Média: {agent.MediaDiaria}</span>
-                                                <span className="group-hover:text-blue-400 transition-colors">Supervisor: {agent.Supervisor.split(' ')[0]}</span>
+                                                <div className={`h-full rounded-full transition-all duration-500 ${agent.StatusMeta ? 'bg-green-500' : 'bg-blue-500'}`} style={{width: `${Math.min(100, (agent.Trabalhados / goals.trabalhados) * 100)}%`}}></div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-
-                            {/* Chart Column */}
                             <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 lg:col-span-2 flex flex-col h-full">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="font-bold text-slate-100 text-lg">Análise de Perda</h3>
-                                    <div className="flex gap-4 text-xs font-medium text-slate-400">
-                                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span>Trabalhados</span>
-                                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500"></span>Fechados</span>
-                                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span>Recusas</span>
-                                    </div>
-                                </div>
+                                <h3 className="font-bold text-slate-100 text-lg mb-6">Análise de Perda</h3>
                                 <div className="flex-1 w-full min-h-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={analytics.rankingAgentes.slice(0, 20)} margin={{top: 10, right: 10, left: 0, bottom: 60}} barSize={20}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
                                             <XAxis dataKey="name" tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} interval={0} angle={-45} textAnchor="end" height={60} />
                                             <YAxis tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                            <Tooltip 
-                                                contentStyle={TOOLTIP_STYLE}
-                                                cursor={{fill: '#1e293b'}}
-                                            />
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{fill: '#1e293b'}} />
                                             <Bar dataKey="Trabalhados" stackId="a" fill={COLORS.blue} radius={[0, 0, 4, 4]} />
                                             <Bar dataKey="Fechados" stackId="a" fill={COLORS.yellow} />
                                             <Bar dataKey="Recusas" stackId="a" fill={COLORS.red} radius={[4, 4, 0, 0]} />
@@ -308,7 +276,6 @@ export const Dashboard: React.FC = () => {
                             <KpiCard title="Depósitos Eliminados" value={analytics.totalDepElim.toLocaleString()} sub="Controle Mecânico" icon={Target} color="red" />
                             <KpiCard title="Uso Larvicida (g)" value={analytics.totalLarvicida.toFixed(1)} sub="Controle Químico" icon={ClipboardList} color="purple" />
                         </div>
-
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 h-96">
                                 <h3 className="font-bold text-slate-100 text-lg mb-6">Tipos de Depósitos (A1 - E)</h3>
@@ -338,23 +305,90 @@ export const Dashboard: React.FC = () => {
                     </div>
                 )}
 
+                {/* Tab Content: Neighborhoods (NEW) */}
+                {activeTab === 'neighborhoods' && (
+                    <div className="space-y-4 animate-in fade-in duration-500">
+                        {/* Legend */}
+                        <div className="flex flex-wrap gap-4 items-center justify-end text-sm text-slate-400">
+                            <span className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-green-500"></span> Cobertura ≥ 80%
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-yellow-500"></span> 60% a 79.9%
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-red-500"></span> &lt; 60%
+                            </span>
+                        </div>
+
+                        <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden">
+                            <div className="px-6 py-5 border-b border-slate-800 bg-slate-800/50 flex justify-between items-center">
+                                <h3 className="font-bold text-teal-400 flex items-center gap-2">
+                                    <MapPin size={20} />
+                                    Cobertura por Bairro
+                                </h3>
+                                <span className="text-xs text-slate-500">
+                                    Baseado na meta de imóveis por ciclo
+                                </span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left text-slate-400">
+                                    <thead className="text-xs text-slate-500 uppercase bg-slate-800/50 border-b border-slate-700">
+                                        <tr>
+                                            <th className="px-6 py-4 font-semibold w-1/4">Bairro</th>
+                                            <th className="px-6 py-4 font-semibold text-center">Visitados / Meta</th>
+                                            <th className="px-6 py-4 font-semibold w-1/4">Progresso Cobertura</th>
+                                            <th className="px-6 py-4 font-semibold text-center">Res</th>
+                                            <th className="px-6 py-4 font-semibold text-center">TB</th>
+                                            <th className="px-6 py-4 font-semibold text-center">Com</th>
+                                            <th className="px-6 py-4 font-semibold text-center">Outros</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/50">
+                                        {analytics.neighborhoods.map((b, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-slate-200">{b.name}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className="text-slate-200 font-bold">{b.visited}</span> 
+                                                    <span className="text-slate-600 mx-1">/</span> 
+                                                    <span className="text-slate-500">{b.target > 0 ? b.target : '-'}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex-1 bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700/50">
+                                                            <div 
+                                                                className={`h-full rounded-full transition-all duration-700 ${getCoverageColor(b.coverage)}`} 
+                                                                style={{width: `${Math.min(100, b.coverage)}%`}}
+                                                            ></div>
+                                                        </div>
+                                                        <span className="text-xs font-bold min-w-[3rem] text-right">{b.coverage.toFixed(1)}%</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.R}</td>
+                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.Tb}</td>
+                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.Comercio}</td>
+                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.O}</td>
+                                            </tr>
+                                        ))}
+                                        {analytics.neighborhoods.length === 0 && (
+                                            <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">Nenhum dado de bairro encontrado. Verifique a coluna "Bairro" no arquivo.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Tab Content: Property */}
                 {activeTab === 'property' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
                         <div className="lg:col-span-2 bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-8 h-[500px] flex flex-col">
                             <h3 className="font-bold text-slate-100 text-lg mb-2">Distribuição por Tipo de Imóvel</h3>
-                            <p className="text-sm text-slate-400 mb-6">Visualização da proporção de tipos de imóveis trabalhados no período.</p>
                             <div className="flex-1">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie
-                                            data={analytics.chartImoveis}
-                                            cx="50%" cy="50%"
-                                            innerRadius={80} outerRadius={140}
-                                            paddingAngle={4}
-                                            dataKey="value"
-                                            stroke="none"
-                                        >
+                                        <Pie data={analytics.chartImoveis} cx="50%" cy="50%" innerRadius={80} outerRadius={140} paddingAngle={4} dataKey="value" stroke="none">
                                             {analytics.chartImoveis.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index % Object.values(COLORS).length]} />
                                             ))}
@@ -367,21 +401,17 @@ export const Dashboard: React.FC = () => {
                         <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6">
                             <h3 className="font-bold text-slate-100 text-lg mb-6">Detalhes</h3>
                             <div className="space-y-4">
-                                {analytics.chartImoveis.map((item, idx) => {
-                                    const labels: any = { 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' };
-                                    return (
-                                        <div key={item.name} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-700">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-4 h-4 rounded-full shadow-sm" style={{backgroundColor: Object.values(COLORS)[idx % Object.values(COLORS).length]}}></div>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium text-slate-200">{labels[item.name] || item.name}</span>
-                                                    <span className="text-xs text-slate-500 font-mono">{item.name}</span>
-                                                </div>
+                                {analytics.chartImoveis.map((item, idx) => (
+                                    <div key={item.name} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-700">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-4 h-4 rounded-full shadow-sm" style={{backgroundColor: Object.values(COLORS)[idx % Object.values(COLORS).length]}}></div>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-slate-200">{{ 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' }[item.name] || item.name}</span>
                                             </div>
-                                            <span className="font-bold text-slate-300 bg-slate-800 px-2 py-1 rounded text-sm border border-slate-700">{item.value.toLocaleString()}</span>
                                         </div>
-                                    );
-                                })}
+                                        <span className="font-bold text-slate-300 bg-slate-800 px-2 py-1 rounded text-sm border border-slate-700">{item.value.toLocaleString()}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -390,27 +420,17 @@ export const Dashboard: React.FC = () => {
                 {/* Tab Content: Teams */}
                 {activeTab === 'teams' && (
                     <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-8 animate-in fade-in duration-500">
-                        <div className="mb-8">
-                            <h3 className="font-bold text-slate-100 text-lg">Comparativo de Produtividade: Supervisores</h3>
-                            <p className="text-slate-400">Média de imóveis trabalhados por agente em cada equipe.</p>
-                        </div>
+                        <h3 className="font-bold text-slate-100 text-lg mb-8">Comparativo de Produtividade: Supervisores</h3>
                         <div className="h-96">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={analytics.rankingSupervisores} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
                                     <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 12}} axisLine={false} tickLine={false} />
                                     <YAxis tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                    <Tooltip 
-                                        cursor={{fill: '#1e293b'}}
-                                        contentStyle={TOOLTIP_STYLE}
-                                    />
+                                    <Tooltip cursor={{fill: '#1e293b'}} contentStyle={TOOLTIP_STYLE} />
                                     <Bar dataKey="MediaPorAgente" radius={[6,6,0,0]} barSize={60}>
                                         {analytics.rankingSupervisores.map((entry, index) => (
-                                            <Cell 
-                                                key={`cell-${index}`} 
-                                                fill={entry.name === filters.supervisor ? COLORS.orange : COLORS.purple} 
-                                                className="transition-all duration-300 hover:opacity-80"
-                                            />
+                                            <Cell key={`cell-${index}`} fill={entry.name === filters.supervisor ? COLORS.orange : COLORS.purple} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -427,9 +447,7 @@ export const Dashboard: React.FC = () => {
                                 <AlertTriangle size={20} />
                                 Ocorrências e Pendências
                             </h3>
-                            <span className="bg-slate-900 text-red-400 px-3 py-1 rounded-full text-xs font-bold border border-red-900/50">
-                                {pendenciasList.length} Registros
-                            </span>
+                            <span className="bg-slate-900 text-red-400 px-3 py-1 rounded-full text-xs font-bold border border-red-900/50">{pendenciasList.length} Registros</span>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left text-slate-400">
@@ -448,25 +466,12 @@ export const Dashboard: React.FC = () => {
                                             <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-300">{row.DataISO.split('-').reverse().join('/')}</td>
                                             <td className="px-6 py-4 font-medium text-slate-200">{row.Agente}</td>
                                             <td className="px-6 py-4">{row.Supervisor}</td>
-                                            <td className="px-6 py-4">
-                                                <span className="bg-red-900/30 text-red-400 border border-red-900/50 px-2.5 py-1 rounded-md text-xs font-bold inline-block">
-                                                    {row.Pendencias}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 italic text-slate-500 whitespace-normal break-words min-w-[300px]" title={row.Observacao}>
-                                                "{row.Observacao}"
-                                            </td>
+                                            <td className="px-6 py-4"><span className="bg-red-900/30 text-red-400 border border-red-900/50 px-2.5 py-1 rounded-md text-xs font-bold inline-block">{row.Pendencias}</span></td>
+                                            <td className="px-6 py-4 italic text-slate-500 whitespace-normal break-words min-w-[300px]" title={row.Observacao}>"{row.Observacao}"</td>
                                         </tr>
                                     ))}
                                     {pendenciasList.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <ClipboardList size={32} className="opacity-20" />
-                                                    <p>Nenhuma pendência crítica encontrada nos dados filtrados.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500">Nenhuma pendência encontrada.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -475,12 +480,7 @@ export const Dashboard: React.FC = () => {
                 )}
             </main>
 
-            <GoalModal 
-                isOpen={showGoalModal} 
-                onClose={() => setShowGoalModal(false)} 
-                goals={goals} 
-                setGoals={setGoals} 
-            />
+            <GoalModal isOpen={showGoalModal} onClose={() => setShowGoalModal(false)} goals={goals} setGoals={setGoals} />
         </div>
     );
 };

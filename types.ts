@@ -10,6 +10,7 @@ export interface GoalSettings {
     Agente: string;
     Ciclo: string;
     Mes: string;
+    Bairro: string; // Added Bairro
     DataISO: string;
     Data: string | number; // Raw data
     Total_T: number;
@@ -54,6 +55,20 @@ export interface GoalSettings {
     MediaPorAgente?: string;
   }
   
+  export interface NeighborhoodMetric {
+    name: string;
+    target: number;
+    visited: number;
+    coverage: number;
+    propertyTypes: {
+        R: number;
+        Comercio: number;
+        Tb: number;
+        PE: number;
+        O: number;
+    };
+  }
+  
   export interface DashboardAnalytics {
     totalTrabalhados: number;
     totalFechados: number;
@@ -69,7 +84,7 @@ export interface GoalSettings {
     percPerda: number;
     rankingAgentes: AgentMetric[];
     rankingSupervisores: SupervisorMetric[];
+    neighborhoods: NeighborhoodMetric[]; // Added neighborhoods
     chartDepositos: { name: string; value: number }[];
     chartImoveis: { name: string; value: number }[];
   }
-  

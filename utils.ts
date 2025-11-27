@@ -1,4 +1,4 @@
-import { ProductionData, DashboardAnalytics, GoalSettings } from './types';
+import { ProductionData, DashboardAnalytics, GoalSettings, NeighborhoodMetric } from './types';
 import * as XLSX from 'xlsx';
 
 export const COLORS = {
@@ -12,35 +12,84 @@ export const COLORS = {
   slate: '#64748b'
 };
 
+// Dados baseados na imagem fornecida
+export const NEIGHBORHOOD_TARGETS: Record<string, number> = {
+    'Alegre': 1631,
+    'Alphaville': 728,
+    'Alvorada I': 606,
+    'Alvorada II': 910,
+    'Ana Malaquias': 595,
+    'Ana Moura': 1657,
+    'Ana Rita': 2080,
+    'Arataquinha': 95,
+    'Bairro dos Vieiras': 503,
+    'Bandeirantes': 226,
+    'Bela Vista': 759,
+    'Bromélias': 1344,
+    'Cachoeira Do Vale': 2267,
+    'Centro Norte': 1793,
+    'Centro Sul': 1158,
+    'Coqueiro': 78,
+    'Cruzeirinho': 557,
+    'Distrito Industrial': 145,
+    'Eldorado': 1174,
+    'Esplanada': 164,
+    'Fazenda Boa Vista': 203,
+    'Ferroviarios': 84,
+    'Funcionarios': 853,
+    'Garapa': 170,
+    'Jardim Primavera': 291,
+    'Jardim Vitoria': 236,
+    'Jhon Kennedy': 389,
+    'João XXIII': 942,
+    'Limoeiro': 966,
+    'Macuco': 1466,
+    'Nossa Senhora das Graças': 447,
+    'Nova Esperança': 282,
+    'Novo Horizonte': 862,
+    'Novo Tempo': 1733,
+    'Olaria': 852,
+    'Parque Recanto': 96,
+    'Petropolis': 622,
+    'Primavera': 2167,
+    'Quitandinha': 901,
+    'Recanto do Sossego': 202,
+    'Recanto Verde': 2770,
+    'Santa Cecília': 662,
+    'Santa Maria': 836,
+    'Santa Rita': 94,
+    'Santa Terezinha': 701,
+    'São Cristóvão': 385,
+    'São José': 850,
+    'Serenata': 429,
+    'Timirim': 1114,
+    'Timotinho': 498,
+    'Vale Verde': 280,
+    'Vila dos Técnicos': 242
+};
+
 export const parseExcelDate = (serial: number | string): { mes: string; dataFormatada: string } => {
   let mes = 'Indefinido';
   let dataFormatada = '';
 
   if (typeof serial === 'number') {
-    // Excel date serial conversion
-    // Adicionamos um buffer de 12 horas para evitar erros de arredondamento de fuso horário
-    // que poderiam jogar a data para o dia anterior (ex: 23:59:59)
+    // Excel date serial conversion with buffer
     const date = new Date(Math.round((serial - 25569) * 86400 * 1000) + 12 * 3600 * 1000);
     mes = date.toLocaleString('pt-BR', { month: 'long' });
     dataFormatada = date.toISOString().split('T')[0];
   } else if (typeof serial === 'string') {
-    // Tenta formato DD/MM/AAAA ou DD-MM-AAAA comum no Brasil
     const ptDateRegex = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/;
     const match = serial.match(ptDateRegex);
 
     if (match) {
         const day = parseInt(match[1], 10);
-        const month = parseInt(match[2], 10) - 1; // JS months are 0-11
+        const month = parseInt(match[2], 10) - 1;
         const year = parseInt(match[3], 10);
         const date = new Date(year, month, day);
         mes = date.toLocaleString('pt-BR', { month: 'long' });
-        // Formatação manual ISO segura
         dataFormatada = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     } else {
-        // Fallback para o parser padrão
         try {
-            // Se for string ISO YYYY-MM-DD, forçar interpretação local adicionando hora segura
-            // Evita que new Date("2024-02-01") seja lido como UTC e vire 31/Jan no Brasil
             let dateStr = serial;
             if (/^\d{4}-\d{2}-\d{2}$/.test(serial)) {
                 dateStr += 'T12:00:00';
@@ -85,6 +134,7 @@ export const processDataFile = (file: File): Promise<ProductionData[]> => {
                 Agente: row.Agente || 'N/A',
                 Ciclo: row.Ciclo || 'N/A',
                 Mes: mes,
+                Bairro: row.Bairro || 'N/A', // Read Bairro
                 DataISO: dataFormatada,
                 Total_T: n(row.Total_T),
                 Fechado: n(row.Fechado),
@@ -119,13 +169,26 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     percPerda: 0,
     rankingAgentes: [],
     rankingSupervisores: [],
+    neighborhoods: [],
     chartDepositos: [],
     chartImoveis: []
   };
 
   const agents: Record<string, any> = {};
   const supervisors: Record<string, any> = {};
+  const neighborhoodsData: Record<string, NeighborhoodMetric> = {};
   const uniqueDays = new Set<string>();
+
+  // Initialize neighborhoods from constants
+  Object.keys(NEIGHBORHOOD_TARGETS).forEach(name => {
+      neighborhoodsData[name] = {
+          name,
+          target: NEIGHBORHOOD_TARGETS[name],
+          visited: 0,
+          coverage: 0,
+          propertyTypes: { R: 0, Comercio: 0, Tb: 0, PE: 0, O: 0 }
+      };
+  });
 
   data.forEach(d => {
     uniqueDays.add(d.DataISO + d.Agente);
@@ -160,6 +223,38 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     }
     supervisors[d.Supervisor].Trabalhados += d.Total_T;
     supervisors[d.Supervisor].Agentes.add(d.Agente);
+
+    // Neighborhood Aggregation
+    // Try to match neighborhood name (insensitive) or use 'Outros' if not found
+    let bName = d.Bairro;
+    // Simple normalization to match keys if possible
+    const targetKey = Object.keys(NEIGHBORHOOD_TARGETS).find(k => k.toLowerCase() === bName.toLowerCase());
+    
+    if (targetKey) {
+        neighborhoodsData[targetKey].visited += d.Total_T;
+        neighborhoodsData[targetKey].propertyTypes.R += d.R || 0;
+        neighborhoodsData[targetKey].propertyTypes.Comercio += d.Comercio || 0;
+        neighborhoodsData[targetKey].propertyTypes.Tb += d.Tb || 0;
+        neighborhoodsData[targetKey].propertyTypes.PE += d.PE || 0;
+        neighborhoodsData[targetKey].propertyTypes.O += d.O || 0;
+    } else if (bName !== 'N/A') {
+        // If neighborhood exists in data but not in target list, add it dynamically
+        if (!neighborhoodsData[bName]) {
+             neighborhoodsData[bName] = {
+                name: bName,
+                target: 0, // No target known
+                visited: 0,
+                coverage: 0,
+                propertyTypes: { R: 0, Comercio: 0, Tb: 0, PE: 0, O: 0 }
+            };
+        }
+        neighborhoodsData[bName].visited += d.Total_T;
+        neighborhoodsData[bName].propertyTypes.R += d.R || 0;
+        neighborhoodsData[bName].propertyTypes.Comercio += d.Comercio || 0;
+        neighborhoodsData[bName].propertyTypes.Tb += d.Tb || 0;
+        neighborhoodsData[bName].propertyTypes.PE += d.PE || 0;
+        neighborhoodsData[bName].propertyTypes.O += d.O || 0;
+    }
   });
 
   const diasCount = uniqueDays.size || 1;
@@ -179,6 +274,14 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
       ...s,
       MediaPorAgente: (s.Trabalhados / (s.Agentes.size || 1)).toFixed(0)
   })).sort((a: any, b: any) => b.MediaPorAgente - a.MediaPorAgente);
+
+  // Process Neighborhoods
+  metrics.neighborhoods = Object.values(neighborhoodsData)
+    .map(n => ({
+        ...n,
+        coverage: n.target > 0 ? (n.visited / n.target) * 100 : 0
+    }))
+    .sort((a, b) => b.visited - a.visited); // Default sort by visited
 
   metrics.chartDepositos = Object.entries(metrics.depositos).map(([key, val]) => ({ name: key, value: val }));
   metrics.chartImoveis = Object.entries(metrics.imoveis).map(([key, val]) => ({ name: key, value: val }));
