@@ -453,7 +453,7 @@ export const Dashboard: React.FC = () => {
                                                     {row.Pendencias}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 italic text-slate-500 max-w-xs truncate" title={row.Observacao}>
+                                            <td className="px-6 py-4 italic text-slate-500 whitespace-normal break-words min-w-[300px]" title={row.Observacao}>
                                                 "{row.Observacao}"
                                             </td>
                                         </tr>
