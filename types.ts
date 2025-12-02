@@ -10,7 +10,8 @@ export interface GoalSettings {
     Agente: string;
     Ciclo: string;
     Mes: string;
-    Bairro: string; // Added Bairro
+    Bairro: string;
+    Atividade: string; // Added Atividade
     DataISO: string;
     Data: string | number; // Raw data
     Total_T: number;
@@ -34,6 +35,7 @@ export interface GoalSettings {
     agente: string;
     ciclo: string;
     mes: string;
+    ano: string; // Added Year filter
   }
   
   export interface AgentMetric {
@@ -42,6 +44,7 @@ export interface GoalSettings {
     Trabalhados: number;
     Fechados: number;
     Recusas: number;
+    Resgates: number; // Added Resgates
     Im_Trat: number;
     Dias: Set<string>;
     MediaDiaria?: string;
@@ -84,7 +87,7 @@ export interface GoalSettings {
     percPerda: number;
     rankingAgentes: AgentMetric[];
     rankingSupervisores: SupervisorMetric[];
-    neighborhoods: NeighborhoodMetric[]; // Added neighborhoods
+    neighborhoods: NeighborhoodMetric[];
     chartDepositos: { name: string; value: number }[];
     chartImoveis: { name: string; value: number }[];
   }

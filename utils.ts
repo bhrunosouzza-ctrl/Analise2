@@ -36,7 +36,7 @@ export const NEIGHBORHOOD_TARGETS: Record<string, number> = {
     'Esplanada': 164,
     'Fazenda Boa Vista': 203,
     'Ferroviarios': 84,
-    'Funcionarios': 853,
+    'Funcionários': 853, // Fixed accent
     'Garapa': 170,
     'Jardim Primavera': 291,
     'Jardim Vitoria': 236,
@@ -50,7 +50,7 @@ export const NEIGHBORHOOD_TARGETS: Record<string, number> = {
     'Novo Tempo': 1733,
     'Olaria': 852,
     'Parque Recanto': 96,
-    'Petropolis': 622,
+    'Petrópolis': 622, // Fixed accent
     'Primavera': 2167,
     'Quitandinha': 901,
     'Recanto do Sossego': 202,
@@ -134,7 +134,8 @@ export const processDataFile = (file: File): Promise<ProductionData[]> => {
                 Agente: row.Agente || 'N/A',
                 Ciclo: row.Ciclo || 'N/A',
                 Mes: mes,
-                Bairro: row.Bairro || 'N/A', // Read Bairro
+                Bairro: row.Bairro || 'N/A',
+                Atividade: row.Atividade || 'N/A', // Read Atividade
                 DataISO: dataFormatada,
                 Total_T: n(row.Total_T),
                 Fechado: n(row.Fechado),
@@ -208,12 +209,13 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     if (!agents[d.Agente]) {
         agents[d.Agente] = {
             name: d.Agente, Supervisor: d.Supervisor,
-            Trabalhados: 0, Fechados: 0, Recusas: 0, Im_Trat: 0, Dias: new Set()
+            Trabalhados: 0, Fechados: 0, Recusas: 0, Resgates: 0, Im_Trat: 0, Dias: new Set()
         };
     }
     agents[d.Agente].Trabalhados += d.Total_T;
     agents[d.Agente].Fechados += d.Fechado;
     agents[d.Agente].Recusas += d.Recusa;
+    agents[d.Agente].Resgates += d.Resgate; // Accumulate Resgates
     agents[d.Agente].Im_Trat += d.Im_Trat;
     agents[d.Agente].Dias.add(d.DataISO);
 
@@ -225,35 +227,35 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     supervisors[d.Supervisor].Agentes.add(d.Agente);
 
     // Neighborhood Aggregation
-    // Try to match neighborhood name (insensitive) or use 'Outros' if not found
-    let bName = d.Bairro;
-    // Simple normalization to match keys if possible
-    const targetKey = Object.keys(NEIGHBORHOOD_TARGETS).find(k => k.toLowerCase() === bName.toLowerCase());
-    
-    if (targetKey) {
-        neighborhoodsData[targetKey].visited += d.Total_T;
-        neighborhoodsData[targetKey].propertyTypes.R += d.R || 0;
-        neighborhoodsData[targetKey].propertyTypes.Comercio += d.Comercio || 0;
-        neighborhoodsData[targetKey].propertyTypes.Tb += d.Tb || 0;
-        neighborhoodsData[targetKey].propertyTypes.PE += d.PE || 0;
-        neighborhoodsData[targetKey].propertyTypes.O += d.O || 0;
-    } else if (bName !== 'N/A') {
-        // If neighborhood exists in data but not in target list, add it dynamically
-        if (!neighborhoodsData[bName]) {
-             neighborhoodsData[bName] = {
-                name: bName,
-                target: 0, // No target known
-                visited: 0,
-                coverage: 0,
-                propertyTypes: { R: 0, Comercio: 0, Tb: 0, PE: 0, O: 0 }
-            };
+    // Exclude 'Levantamento de Índice' only for neighborhood stats
+    if ((d.Atividade || '').toLowerCase() !== 'levantamento de índice') {
+        let bName = d.Bairro;
+        const targetKey = Object.keys(NEIGHBORHOOD_TARGETS).find(k => k.toLowerCase() === bName.toLowerCase());
+        
+        if (targetKey) {
+            neighborhoodsData[targetKey].visited += d.Total_T;
+            neighborhoodsData[targetKey].propertyTypes.R += d.R || 0;
+            neighborhoodsData[targetKey].propertyTypes.Comercio += d.Comercio || 0;
+            neighborhoodsData[targetKey].propertyTypes.Tb += d.Tb || 0;
+            neighborhoodsData[targetKey].propertyTypes.PE += d.PE || 0;
+            neighborhoodsData[targetKey].propertyTypes.O += d.O || 0;
+        } else if (bName !== 'N/A') {
+            if (!neighborhoodsData[bName]) {
+                 neighborhoodsData[bName] = {
+                    name: bName,
+                    target: 0,
+                    visited: 0,
+                    coverage: 0,
+                    propertyTypes: { R: 0, Comercio: 0, Tb: 0, PE: 0, O: 0 }
+                };
+            }
+            neighborhoodsData[bName].visited += d.Total_T;
+            neighborhoodsData[bName].propertyTypes.R += d.R || 0;
+            neighborhoodsData[bName].propertyTypes.Comercio += d.Comercio || 0;
+            neighborhoodsData[bName].propertyTypes.Tb += d.Tb || 0;
+            neighborhoodsData[bName].propertyTypes.PE += d.PE || 0;
+            neighborhoodsData[bName].propertyTypes.O += d.O || 0;
         }
-        neighborhoodsData[bName].visited += d.Total_T;
-        neighborhoodsData[bName].propertyTypes.R += d.R || 0;
-        neighborhoodsData[bName].propertyTypes.Comercio += d.Comercio || 0;
-        neighborhoodsData[bName].propertyTypes.Tb += d.Tb || 0;
-        neighborhoodsData[bName].propertyTypes.PE += d.PE || 0;
-        neighborhoodsData[bName].propertyTypes.O += d.O || 0;
     }
   });
 
@@ -281,7 +283,7 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
         ...n,
         coverage: n.target > 0 ? (n.visited / n.target) * 100 : 0
     }))
-    .sort((a, b) => b.visited - a.visited); // Default sort by visited
+    .sort((a, b) => b.visited - a.visited);
 
   metrics.chartDepositos = Object.entries(metrics.depositos).map(([key, val]) => ({ name: key, value: val }));
   metrics.chartImoveis = Object.entries(metrics.imoveis).map(([key, val]) => ({ name: key, value: val }));

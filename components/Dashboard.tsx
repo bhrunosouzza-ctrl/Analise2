@@ -14,6 +14,79 @@ import { KpiCard } from './KpiCard';
 import { GoalModal } from './GoalModal';
 import { generatePDFReport } from './ReportGenerator';
 
+// --- Custom Tooltip Components ---
+
+const CustomBarTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        // Attempt to find extra data in the payload (like Supervisor for agents)
+        const data = payload[0].payload;
+        const total = payload.reduce((sum: number, entry: any) => sum + (entry.value || 0), 0);
+
+        return (
+            <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 p-4 rounded-xl shadow-2xl z-50 min-w-[200px]">
+                <div className="border-b border-slate-700 pb-2 mb-2">
+                    <p className="font-bold text-slate-100 text-base">{label}</p>
+                    {data.Supervisor && (
+                        <p className="text-xs text-slate-400">Sup: {data.Supervisor}</p>
+                    )}
+                    {data.Agentes && (
+                        <p className="text-xs text-slate-400">Agentes Ativos: {data.Agentes.size || data.Agentes.length}</p>
+                    )}
+                </div>
+                <div className="space-y-1.5">
+                    {payload.map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between text-sm gap-4">
+                            <span className="flex items-center gap-2 text-slate-300">
+                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }}></span>
+                                {entry.name}:
+                            </span>
+                            <span className="font-mono font-bold text-slate-100">
+                                {entry.value?.toLocaleString()}
+                            </span>
+                        </div>
+                    ))}
+                    {payload.length > 1 && (
+                        <div className="border-t border-slate-700 mt-2 pt-2 flex items-center justify-between text-sm">
+                            <span className="font-semibold text-slate-400">Total Visitas:</span>
+                            <span className="font-mono font-bold text-white">{total.toLocaleString()}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
+const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0];
+        const percent = (data.payload as any).percent || 0;
+
+        return (
+            <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 p-4 rounded-xl shadow-2xl z-50">
+                <div className="flex items-center gap-2 mb-2">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: data.fill }}></span>
+                    <p className="font-bold text-slate-100 text-base">
+                        {{ 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' }[data.name || ''] || data.name}
+                    </p>
+                </div>
+                <div className="space-y-1 text-sm text-slate-300">
+                    <div className="flex justify-between gap-6">
+                        <span>Quantidade:</span>
+                        <span className="font-mono font-bold text-white">{data.value?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between gap-6">
+                        <span>Percentual:</span>
+                        <span className="font-mono font-bold text-blue-400">{(percent * 100).toFixed(1)}%</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 export const Dashboard: React.FC = () => {
     const [rawData, setRawData] = useState<ProductionData[]>([]);
     const [loading, setLoading] = useState(false);
@@ -31,7 +104,8 @@ export const Dashboard: React.FC = () => {
         supervisor: 'Todos',
         agente: 'Todos',
         ciclo: 'Todos',
-        mes: 'Todos'
+        mes: 'Todos',
+        ano: 'Todos'
     });
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,7 +128,8 @@ export const Dashboard: React.FC = () => {
             return (filters.supervisor === 'Todos' || item.Supervisor === filters.supervisor) &&
                    (filters.agente === 'Todos' || item.Agente === filters.agente) &&
                    (filters.ciclo === 'Todos' || item.Ciclo === filters.ciclo) &&
-                   (filters.mes === 'Todos' || item.Mes === filters.mes);
+                   (filters.mes === 'Todos' || item.Mes === filters.mes) &&
+                   (filters.ano === 'Todos' || item.DataISO.startsWith(filters.ano));
         });
     }, [rawData, filters]);
 
@@ -62,6 +137,7 @@ export const Dashboard: React.FC = () => {
 
     const options = useMemo(() => {
         const getUnique = (key: string) => [...new Set(rawData.map(item => item[key]).filter(Boolean))];
+        const years = [...new Set(rawData.map(d => d.DataISO.split('-')[0]))].sort().reverse();
         
         const monthOrder = [
             'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -78,7 +154,8 @@ export const Dashboard: React.FC = () => {
                 const weightA = idxA === -1 ? 999 : idxA;
                 const weightB = idxB === -1 ? 999 : idxB;
                 return weightA - weightB;
-            })
+            }),
+            anos: years
         };
     }, [rawData]);
 
@@ -92,7 +169,7 @@ export const Dashboard: React.FC = () => {
     }, [filteredData]);
 
     const handleExportPDF = () => {
-        generatePDFReport(analytics, pendenciasList, filters);
+        generatePDFReport(analytics, pendenciasList, filters, filteredData);
     };
 
     if (rawData.length === 0) {
@@ -119,7 +196,6 @@ export const Dashboard: React.FC = () => {
 
     const CHART_GRID_COLOR = "#334155";
     const CHART_TEXT_COLOR = "#94a3b8";
-    const TOOLTIP_STYLE = { backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)' };
 
     const getCoverageColor = (percent: number) => {
         if (percent >= 80) return 'bg-green-500';
@@ -153,7 +229,7 @@ export const Dashboard: React.FC = () => {
                             <FileText size={16} /> Relatório PDF
                         </button>
 
-                        {['Supervisor', 'Agente', 'Ciclo', 'Mes'].map(filterKey => (
+                        {['Ano', 'Supervisor', 'Agente', 'Ciclo', 'Mes'].map(filterKey => (
                             <div key={filterKey} className="relative">
                                 <select 
                                     className="appearance-none bg-slate-800 border border-slate-700 text-sm font-medium text-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-8 py-2.5 shadow-sm outline-none transition-all cursor-pointer hover:bg-slate-700"
@@ -161,7 +237,7 @@ export const Dashboard: React.FC = () => {
                                     onChange={(e) => setFilters({...filters, [filterKey.toLowerCase()]: e.target.value})}
                                 >
                                     <option value="Todos">{filterKey}: Todos</option>
-                                    {(options as any)[filterKey.toLowerCase() === 'supervisor' ? 'supervisores' : filterKey.toLowerCase() === 'mes' ? 'meses' : filterKey.toLowerCase() + 's']?.map((opt: string) => (
+                                    {(options as any)[filterKey.toLowerCase() === 'supervisor' ? 'supervisores' : filterKey.toLowerCase() === 'mes' ? 'meses' : filterKey.toLowerCase() === 'ano' ? 'anos' : filterKey.toLowerCase() + 's']?.map((opt: string) => (
                                         <option key={opt} value={opt}>{opt}</option>
                                     ))}
                                 </select>
@@ -244,6 +320,10 @@ export const Dashboard: React.FC = () => {
                                             <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-700/50">
                                                 <div className={`h-full rounded-full transition-all duration-500 ${agent.StatusMeta ? 'bg-green-500' : 'bg-blue-500'}`} style={{width: `${Math.min(100, (agent.Trabalhados / goals.trabalhados) * 100)}%`}}></div>
                                             </div>
+                                            <div className="flex justify-between mt-2 text-[10px] text-slate-500 font-medium px-1">
+                                                <span>Média: {agent.MediaDiaria}/dia</span>
+                                                <span>Resg: {agent.Resgates}</span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -256,7 +336,7 @@ export const Dashboard: React.FC = () => {
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
                                             <XAxis dataKey="name" tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} interval={0} angle={-45} textAnchor="end" height={60} />
                                             <YAxis tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{fill: '#1e293b'}} />
+                                            <Tooltip content={<CustomBarTooltip />} cursor={{fill: '#1e293b'}} />
                                             <Bar dataKey="Trabalhados" stackId="a" fill={COLORS.blue} radius={[0, 0, 4, 4]} />
                                             <Bar dataKey="Fechados" stackId="a" fill={COLORS.yellow} />
                                             <Bar dataKey="Recusas" stackId="a" fill={COLORS.red} radius={[4, 4, 0, 0]} />
@@ -284,7 +364,7 @@ export const Dashboard: React.FC = () => {
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
                                         <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
                                         <YAxis tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                        <Tooltip cursor={{fill: '#1e293b'}} contentStyle={TOOLTIP_STYLE}/>
+                                        <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
                                         <Bar dataKey="value" fill={COLORS.orange} radius={[4,4,0,0]} name="Qtd" barSize={40} />
                                     </BarChart>
                                 </ResponsiveContainer>
@@ -296,7 +376,7 @@ export const Dashboard: React.FC = () => {
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_GRID_COLOR} />
                                         <XAxis type="number" tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
                                         <YAxis dataKey="name" type="category" width={100} tick={{fontSize:11, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                        <Tooltip cursor={{fill: '#1e293b'}} contentStyle={TOOLTIP_STYLE}/>
+                                        <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
                                         <Bar dataKey="Im_Trat" fill={COLORS.teal} radius={[0,4,4,0]} name="Imóveis Tratados" barSize={20} />
                                     </BarChart>
                                 </ResponsiveContainer>
@@ -393,7 +473,7 @@ export const Dashboard: React.FC = () => {
                                                 <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index % Object.values(COLORS).length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip contentStyle={TOOLTIP_STYLE} />
+                                        <Tooltip content={<CustomPieTooltip />} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -427,7 +507,7 @@ export const Dashboard: React.FC = () => {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
                                     <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 12}} axisLine={false} tickLine={false} />
                                     <YAxis tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                    <Tooltip cursor={{fill: '#1e293b'}} contentStyle={TOOLTIP_STYLE} />
+                                    <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
                                     <Bar dataKey="MediaPorAgente" radius={[6,6,0,0]} barSize={60}>
                                         {analytics.rankingSupervisores.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.name === filters.supervisor ? COLORS.orange : COLORS.purple} />
