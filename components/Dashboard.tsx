@@ -13,6 +13,7 @@ import { processDataFile, calculateAnalytics, COLORS } from '../utils';
 import { KpiCard } from './KpiCard';
 import { GoalModal } from './GoalModal';
 import { generatePDFReport } from './ReportGenerator';
+import { AgentDetailsModal } from './AgentDetailsModal';
 
 // --- Custom Tooltip Components ---
 
@@ -92,6 +93,7 @@ export const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'property' | 'teams' | 'issues' | 'neighborhoods'>('overview');
     const [showGoalModal, setShowGoalModal] = useState(false);
+    const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
     const [goals, setGoals] = useState<GoalSettings>({
         trabalhados: 1000,
@@ -123,6 +125,7 @@ export const Dashboard: React.FC = () => {
         }
     };
 
+    // Filter used for the main dashboard display
     const filteredData = useMemo(() => {
         return rawData.filter(item => {
             return (filters.supervisor === 'Todos' || item.Supervisor === filters.supervisor) &&
@@ -134,6 +137,19 @@ export const Dashboard: React.FC = () => {
     }, [rawData, filters]);
 
     const analytics = useMemo(() => calculateAnalytics(filteredData, goals), [filteredData, goals]);
+
+    // Data for the Agent Modal - filters by Year/Supervisor but IGNORES Month/Cycle to show full history
+    const selectedAgentData = useMemo(() => {
+        if (!selectedAgent) return [];
+        return rawData.filter(item => {
+            const matchesAgent = item.Agente === selectedAgent;
+            const matchesYear = filters.ano === 'Todos' || item.DataISO.startsWith(filters.ano);
+            // Optionally enforce supervisor match if supervisor filter is active, though Agent name is usually unique
+            const matchesSupervisor = filters.supervisor === 'Todos' || item.Supervisor === filters.supervisor;
+            
+            return matchesAgent && matchesYear && matchesSupervisor;
+        });
+    }, [rawData, selectedAgent, filters.ano, filters.supervisor]);
 
     const options = useMemo(() => {
         const getUnique = (key: string) => [...new Set(rawData.map(item => item[key]).filter(Boolean))];
@@ -313,7 +329,13 @@ export const Dashboard: React.FC = () => {
                                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${idx < 3 ? 'bg-yellow-900/30 text-yellow-500 ring-1 ring-yellow-700' : 'bg-slate-800 text-slate-500 ring-1 ring-slate-700'}`}>
                                                         {idx + 1}
                                                     </div>
-                                                    <span className="text-sm font-semibold text-slate-200 truncate max-w-[120px]" title={agent.name}>{agent.name}</span>
+                                                    <button 
+                                                        onClick={() => setSelectedAgent(agent.name)}
+                                                        className="text-sm font-semibold text-slate-200 truncate max-w-[120px] hover:text-blue-400 hover:underline text-left" 
+                                                        title="Ver detalhes do agente"
+                                                    >
+                                                        {agent.name}
+                                                    </button>
                                                 </div>
                                                 <span className={`text-sm font-bold font-mono ${agent.StatusMeta ? 'text-green-400' : 'text-slate-500'}`}>{agent.Trabalhados}</span>
                                             </div>
@@ -561,6 +583,14 @@ export const Dashboard: React.FC = () => {
             </main>
 
             <GoalModal isOpen={showGoalModal} onClose={() => setShowGoalModal(false)} goals={goals} setGoals={setGoals} />
+            
+            {/* Detailed Agent Modal */}
+            <AgentDetailsModal 
+                isOpen={!!selectedAgent} 
+                onClose={() => setSelectedAgent(null)} 
+                agentName={selectedAgent || ''} 
+                data={selectedAgentData}
+            />
         </div>
     );
 };

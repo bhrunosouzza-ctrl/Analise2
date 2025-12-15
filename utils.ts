@@ -36,7 +36,7 @@ export const NEIGHBORHOOD_TARGETS: Record<string, number> = {
     'Esplanada': 164,
     'Fazenda Boa Vista': 203,
     'Ferroviarios': 84,
-    'Funcionários': 853, // Fixed accent
+    'Funcionários': 853,
     'Garapa': 170,
     'Jardim Primavera': 291,
     'Jardim Vitoria': 236,
@@ -50,7 +50,7 @@ export const NEIGHBORHOOD_TARGETS: Record<string, number> = {
     'Novo Tempo': 1733,
     'Olaria': 852,
     'Parque Recanto': 96,
-    'Petrópolis': 622, // Fixed accent
+    'Petrópolis': 622,
     'Primavera': 2167,
     'Quitandinha': 901,
     'Recanto do Sossego': 202,
@@ -192,7 +192,10 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
   });
 
   data.forEach(d => {
-    uniqueDays.add(d.DataISO + d.Agente);
+    // Only count day if there is production
+    if (d.Total_T > 0) {
+        uniqueDays.add(d.DataISO + d.Agente);
+    }
 
     metrics.totalTrabalhados += d.Total_T;
     metrics.totalFechados += d.Fechado;
@@ -215,9 +218,13 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     agents[d.Agente].Trabalhados += d.Total_T;
     agents[d.Agente].Fechados += d.Fechado;
     agents[d.Agente].Recusas += d.Recusa;
-    agents[d.Agente].Resgates += d.Resgate; // Accumulate Resgates
+    agents[d.Agente].Resgates += d.Resgate;
     agents[d.Agente].Im_Trat += d.Im_Trat;
-    agents[d.Agente].Dias.add(d.DataISO);
+    
+    // Only count day for agent if there is production
+    if (d.Total_T > 0) {
+        agents[d.Agente].Dias.add(d.DataISO);
+    }
 
     // Supervisor Aggregation
     if (!supervisors[d.Supervisor]) {
@@ -227,7 +234,6 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     supervisors[d.Supervisor].Agentes.add(d.Agente);
 
     // Neighborhood Aggregation
-    // Exclude 'Levantamento de Índice' only for neighborhood stats
     if ((d.Atividade || '').toLowerCase() !== 'levantamento de índice') {
         let bName = d.Bairro;
         const targetKey = Object.keys(NEIGHBORHOOD_TARGETS).find(k => k.toLowerCase() === bName.toLowerCase());
