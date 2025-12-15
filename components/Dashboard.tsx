@@ -6,7 +6,8 @@ import {
 } from 'recharts';
 import { 
   UploadCloud, BarChart2, Target, Briefcase, Droplet, 
-  TrendingUp, Home, Users, AlertTriangle, ClipboardList, PieChart as PieIcon, MapPin, FileText 
+  TrendingUp, Home, Users, AlertTriangle, ClipboardList, PieChart as PieIcon, MapPin, FileText,
+  Stethoscope, FileCheck, Clock, UserX, Activity
 } from 'lucide-react';
 import { ProductionData, FilterState, GoalSettings } from '../types';
 import { processDataFile, calculateAnalytics, COLORS } from '../utils';
@@ -91,7 +92,7 @@ const CustomPieTooltip = ({ active, payload }: any) => {
 export const Dashboard: React.FC = () => {
     const [rawData, setRawData] = useState<ProductionData[]>([]);
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'property' | 'teams' | 'issues' | 'neighborhoods'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'property' | 'teams' | 'issues' | 'neighborhoods' | 'hr'>('overview');
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
@@ -183,6 +184,16 @@ export const Dashboard: React.FC = () => {
             d.Pendencias !== '0'
         );
     }, [filteredData]);
+
+    const hrChartData = useMemo(() => {
+        return [
+            { name: 'Atestados', value: analytics.attendance.atestados, fill: COLORS.blue },
+            { name: 'Declarações', value: analytics.attendance.declaracoes, fill: COLORS.teal },
+            { name: 'Consultas', value: analytics.attendance.consultas, fill: COLORS.purple },
+            { name: 'Compensações', value: analytics.attendance.compensacoes, fill: COLORS.orange },
+            { name: 'Faltas Injust.', value: analytics.attendance.faltas, fill: COLORS.red },
+        ].filter(d => d.value > 0);
+    }, [analytics]);
 
     const handleExportPDF = () => {
         generatePDFReport(analytics, pendenciasList, filters, filteredData);
@@ -279,6 +290,7 @@ export const Dashboard: React.FC = () => {
                             { id: 'property', label: 'Imóveis', icon: Home },
                             { id: 'neighborhoods', label: 'Bairros', icon: MapPin },
                             { id: 'teams', label: 'Equipes', icon: Users },
+                            { id: 'hr', label: 'Recursos Humanos', icon: Activity },
                             { id: 'issues', label: 'Pendências', icon: AlertTriangle, count: pendenciasList.length }
                         ].map(tab => (
                             <button
@@ -407,7 +419,7 @@ export const Dashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Tab Content: Neighborhoods (NEW) */}
+                {/* Tab Content: Neighborhoods */}
                 {activeTab === 'neighborhoods' && (
                     <div className="space-y-4 animate-in fade-in duration-500">
                         {/* Legend */}
@@ -537,6 +549,62 @@ export const Dashboard: React.FC = () => {
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab Content: HR (Recursos Humanos) */}
+                {activeTab === 'hr' && (
+                    <div className="space-y-6 animate-in fade-in duration-500">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                            <KpiCard title="Atestados" value={analytics.attendance.atestados} sub="Médicos" icon={Stethoscope} color="blue" />
+                            <KpiCard title="Declarações" value={analytics.attendance.declaracoes} sub="Comparecimento" icon={FileCheck} color="teal" />
+                            <KpiCard title="Consultas" value={analytics.attendance.consultas} sub="Agendadas" icon={Activity} color="purple" />
+                            <KpiCard title="Compensações" value={analytics.attendance.compensacoes} sub="Banco Horas" icon={Clock} color="orange" />
+                            <KpiCard title="Faltas" value={analytics.attendance.faltas} sub="Não Justificadas" icon={UserX} color="red" />
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-1 bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 flex flex-col h-[400px]">
+                                <h3 className="font-bold text-slate-100 text-lg mb-6">Distribuição de Ausências</h3>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie data={hrChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="value" stroke="none">
+                                            {hrChartData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9'}} />
+                                        <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            
+                            <div className="lg:col-span-2 bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 flex flex-col h-[400px]">
+                                <h3 className="font-bold text-slate-100 text-lg mb-6">Top Agentes: Ausências (Geral)</h3>
+                                <div className="flex-1 w-full min-h-0">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart 
+                                            data={[...analytics.rankingAgentes]
+                                                .map(a => ({
+                                                    name: a.name,
+                                                    totalAbsences: a.attendance.atestados + a.attendance.faltas + a.attendance.declaracoes
+                                                }))
+                                                .sort((a,b) => b.totalAbsences - a.totalAbsences)
+                                                .filter(a => a.totalAbsences > 0)
+                                                .slice(0, 15)
+                                            } 
+                                            margin={{top: 10, right: 10, left: 0, bottom: 20}}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+                                            <XAxis dataKey="name" tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} interval={0} angle={-30} textAnchor="end" height={60} />
+                                            <YAxis tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
+                                            <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9'}} cursor={{fill: '#1e293b'}} />
+                                            <Bar dataKey="totalAbsences" fill={COLORS.red} radius={[4, 4, 0, 0]} name="Total Ocorrências" barSize={30} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

@@ -1,4 +1,5 @@
-import { ProductionData, DashboardAnalytics, GoalSettings, NeighborhoodMetric } from './types';
+
+import { ProductionData, DashboardAnalytics, GoalSettings, NeighborhoodMetric, AttendanceMetrics } from './types';
 import * as XLSX from 'xlsx';
 
 export const COLORS = {
@@ -9,7 +10,9 @@ export const COLORS = {
   purple: '#a855f7',
   teal: '#14b8a6',
   yellow: '#eab308',
-  slate: '#64748b'
+  slate: '#64748b',
+  pink: '#ec4899',
+  indigo: '#6366f1'
 };
 
 // Dados baseados na imagem fornecida
@@ -172,7 +175,8 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     rankingSupervisores: [],
     neighborhoods: [],
     chartDepositos: [],
-    chartImoveis: []
+    chartImoveis: [],
+    attendance: { atestados: 0, declaracoes: 0, consultas: 0, compensacoes: 0, faltas: 0 }
   };
 
   const agents: Record<string, any> = {};
@@ -208,11 +212,30 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     ['A1', 'A2', 'B', 'C', 'D1', 'D2', 'E'].forEach(k => metrics.depositos[k] = (metrics.depositos[k] || 0) + (d[k] || 0));
     ['R', 'Comercio', 'Tb', 'PE', 'O'].forEach(k => metrics.imoveis[k] = (metrics.imoveis[k] || 0) + (d[k] || 0));
 
+    // Calculate HR Metrics
+    const p = (d.Pendencias || '').toLowerCase();
+    let isAtestado = false, isDeclaracao = false, isConsulta = false, isCompensacao = false, isFalta = false;
+
+    if (p.includes('atestado')) { metrics.attendance.atestados++; isAtestado = true; }
+    else if (p.includes('declaração') || p.includes('declaracao')) { metrics.attendance.declaracoes++; isDeclaracao = true; }
+    else if (p.includes('consulta')) { metrics.attendance.consultas++; isConsulta = true; }
+    else if (p.includes('compensação') || p.includes('compensacao')) { metrics.attendance.compensacoes++; isCompensacao = true; }
+    else if (p.includes('falta')) {
+        // If it says "falta" but also "justificada" without "não" or "injustificada", it is justified.
+        // Otherwise (plain "falta", "falta não justificada", "falta injustificada"), it counts as a Fault.
+        const isJustificada = p.includes('justificada') && !p.includes('não') && !p.includes('nao') && !p.includes('injustificada');
+        if (!isJustificada) {
+            metrics.attendance.faltas++;
+            isFalta = true;
+        }
+    }
+
     // Agent Aggregation
     if (!agents[d.Agente]) {
         agents[d.Agente] = {
             name: d.Agente, Supervisor: d.Supervisor,
-            Trabalhados: 0, Fechados: 0, Recusas: 0, Resgates: 0, Im_Trat: 0, Dias: new Set()
+            Trabalhados: 0, Fechados: 0, Recusas: 0, Resgates: 0, Im_Trat: 0, Dias: new Set(),
+            attendance: { atestados: 0, declaracoes: 0, consultas: 0, compensacoes: 0, faltas: 0 }
         };
     }
     agents[d.Agente].Trabalhados += d.Total_T;
@@ -221,6 +244,13 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
     agents[d.Agente].Resgates += d.Resgate;
     agents[d.Agente].Im_Trat += d.Im_Trat;
     
+    // Add per-agent attendance
+    if (isAtestado) agents[d.Agente].attendance.atestados++;
+    if (isDeclaracao) agents[d.Agente].attendance.declaracoes++;
+    if (isConsulta) agents[d.Agente].attendance.consultas++;
+    if (isCompensacao) agents[d.Agente].attendance.compensacoes++;
+    if (isFalta) agents[d.Agente].attendance.faltas++;
+
     // Only count day for agent if there is production
     if (d.Total_T > 0) {
         agents[d.Agente].Dias.add(d.DataISO);

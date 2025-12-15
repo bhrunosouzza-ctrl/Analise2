@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell 
 } from 'recharts';
-import { X, Briefcase, CheckCircle, XCircle, AlertCircle, Droplet, Home, Calendar, TrendingUp } from 'lucide-react';
+import { X, Briefcase, CheckCircle, XCircle, AlertCircle, Droplet, Home, Calendar, TrendingUp, Activity, UserX, Clock, FileCheck } from 'lucide-react';
 import { ProductionData } from '../types';
 import { COLORS } from '../utils';
 
@@ -30,7 +30,8 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({ isOpen, on
       totalLarvicida: 0,
       uniqueDays: new Set<string>(),
       imoveis: { R: 0, Comercio: 0, Tb: 0, PE: 0, O: 0 } as Record<string, number>,
-      byCycle: {} as Record<string, any>
+      byCycle: {} as Record<string, any>,
+      attendance: { atestados: 0, declaracoes: 0, consultas: 0, compensacoes: 0, faltas: 0 }
     };
 
     data.forEach(d => {
@@ -51,6 +52,17 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({ isOpen, on
       agg.imoveis.Tb += d.Tb || 0;
       agg.imoveis.PE += d.PE || 0;
       agg.imoveis.O += d.O || 0;
+
+      // HR Counts
+      const p = (d.Pendencias || '').toLowerCase();
+      if (p.includes('atestado')) agg.attendance.atestados++;
+      else if (p.includes('declaração') || p.includes('declaracao')) agg.attendance.declaracoes++;
+      else if (p.includes('consulta')) agg.attendance.consultas++;
+      else if (p.includes('compensação') || p.includes('compensacao')) agg.attendance.compensacoes++;
+      else if (p.includes('falta')) {
+         const isJustificada = p.includes('justificada') && !p.includes('não') && !p.includes('nao') && !p.includes('injustificada');
+         if (!isJustificada) agg.attendance.faltas++;
+      }
 
       if (!agg.byCycle[d.Ciclo]) {
         agg.byCycle[d.Ciclo] = { 
@@ -178,6 +190,35 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({ isOpen, on
                     <Droplet size={14} /> Larvicida (g)
                 </div>
                 <div className="text-2xl font-bold text-purple-400">{analytics.totalLarvicida.toFixed(1)}</div>
+             </div>
+          </div>
+
+          {/* HR / Pessoal Stats Row */}
+          <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-6">
+             <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2">
+                 <Activity size={18} className="text-red-400"/> Histórico de Pessoal (RH)
+             </h3>
+             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                 <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-center">
+                    <div className="text-xs text-slate-500 uppercase font-bold mb-1 flex justify-center items-center gap-1"><Activity size={12}/> Atestados</div>
+                    <div className="text-xl font-bold text-blue-400">{analytics.attendance.atestados}</div>
+                 </div>
+                 <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-center">
+                    <div className="text-xs text-slate-500 uppercase font-bold mb-1 flex justify-center items-center gap-1"><FileCheck size={12}/> Declarações</div>
+                    <div className="text-xl font-bold text-teal-400">{analytics.attendance.declaracoes}</div>
+                 </div>
+                 <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-center">
+                    <div className="text-xs text-slate-500 uppercase font-bold mb-1 flex justify-center items-center gap-1"><Activity size={12}/> Consultas</div>
+                    <div className="text-xl font-bold text-purple-400">{analytics.attendance.consultas}</div>
+                 </div>
+                 <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-center">
+                    <div className="text-xs text-slate-500 uppercase font-bold mb-1 flex justify-center items-center gap-1"><Clock size={12}/> Compensações</div>
+                    <div className="text-xl font-bold text-orange-400">{analytics.attendance.compensacoes}</div>
+                 </div>
+                 <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-center">
+                    <div className="text-xs text-slate-500 uppercase font-bold mb-1 flex justify-center items-center gap-1"><UserX size={12}/> Faltas Inj.</div>
+                    <div className="text-xl font-bold text-red-400">{analytics.attendance.faltas}</div>
+                 </div>
              </div>
           </div>
 

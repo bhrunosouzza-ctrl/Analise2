@@ -1,3 +1,4 @@
+
 export interface GoalSettings {
     trabalhados: number;
     diariaMin: number;
@@ -37,6 +38,14 @@ export interface GoalSettings {
     mes: string;
     ano: string; // Added Year filter
   }
+
+  export interface AttendanceMetrics {
+    atestados: number;
+    declaracoes: number;
+    consultas: number;
+    compensacoes: number;
+    faltas: number;
+  }
   
   export interface AgentMetric {
     name: string;
@@ -49,6 +58,7 @@ export interface GoalSettings {
     Dias: Set<string>;
     MediaDiaria?: string;
     StatusMeta?: boolean;
+    attendance: AttendanceMetrics; // Added attendance breakdown per agent
   }
   
   export interface SupervisorMetric {
@@ -90,4 +100,5 @@ export interface GoalSettings {
     neighborhoods: NeighborhoodMetric[];
     chartDepositos: { name: string; value: number }[];
     chartImoveis: { name: string; value: number }[];
+    attendance: AttendanceMetrics; // Added global attendance metrics
   }
