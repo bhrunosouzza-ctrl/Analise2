@@ -47,7 +47,7 @@ export const NEIGHBORHOOD_TARGETS: Record<string, number> = {
     'João XXIII': 1119,
     'Limoeiro': 966,
     'Macuco': 1466,
-    'Nossa Senhora das Graças': 447,
+    'Nossa Senhora das Graças': 477,
     'Nova Esperança': 282,
     'Novo Horizonte': 862,
     'Novo Tempo': 1733,
