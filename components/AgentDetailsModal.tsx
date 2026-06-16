@@ -115,81 +115,87 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({ isOpen, on
     : '0';
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-6xl max-h-[90vh] shadow-2xl flex flex-col">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 animate-in fade-in duration-200 p-0 sm:p-4">
+      {/* Click outside backdrop */}
+      <div className="absolute inset-0 cursor-pointer" onClick={onClose}></div>
+      
+      <div className="relative bg-slate-900 border-t sm:border border-slate-800 rounded-t-[30px] sm:rounded-2xl w-full max-w-5xl h-[92vh] sm:h-auto sm:max-h-[90vh] shadow-2xl flex flex-col transition-all animate-in slide-in-from-bottom duration-350 z-10 pb-6 sm:pb-0">
         
+        {/* Pull handle decoration for mobile */}
+        <div className="w-12 h-1 bg-slate-800 rounded-full mx-auto my-3 sm:hidden" onClick={onClose}></div>
+
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-800/50">
+        <div className="flex justify-between items-center p-5 sm:p-6 border-b border-slate-800/85 bg-slate-800/20 rounded-t-[30px] sm:rounded-t-2xl">
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h2 className="text-lg sm:text-2xl font-black text-white flex items-center gap-2">
               {agentName}
-              <span className="text-sm font-normal text-slate-400 px-3 py-1 bg-slate-800 rounded-full border border-slate-700">
+              <span className="text-[10px] sm:text-sm font-bold text-slate-400 px-2.5 py-0.5 bg-slate-800/80 rounded-full border border-slate-700">
                 Sup: {analytics.supervisor}
               </span>
             </h2>
-            <p className="text-slate-400 text-sm mt-1">Relatório Detalhado de Performance</p>
+            <p className="text-slate-500 text-[10px] sm:text-sm mt-0.5">Relatório detalhado de rendimento</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-            <X size={24} />
+          <button onClick={onClose} className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-colors">
+            <X size={20} />
           </button>
         </div>
 
         {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar space-y-6">
           
           {/* KPI Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <Briefcase size={14} /> Total Visitas
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <Briefcase size={12} /> Total Visitas
                 </div>
-                <div className="text-2xl font-bold text-blue-400">{analytics.totalTrabalhados.toLocaleString()}</div>
+                <div className="text-lg font-bold text-blue-400">{analytics.totalTrabalhados.toLocaleString()}</div>
              </div>
              
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <Calendar size={14} /> Dias Trabalhados
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <Calendar size={12} /> Dias Ativos
                 </div>
-                <div className="text-2xl font-bold text-slate-200">{totalDays}</div>
+                <div className="text-lg font-bold text-slate-200">{totalDays}</div>
              </div>
 
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <TrendingUp size={14} /> Média Diária
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <TrendingUp size={12} /> Média Diária
                 </div>
-                <div className="text-2xl font-bold text-slate-200">{globalAverage}</div>
+                <div className="text-lg font-bold text-slate-200">{globalAverage}</div>
              </div>
 
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <CheckCircle size={14} /> Eficiência
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <CheckCircle size={12} /> Eficiência
                 </div>
-                <div className="text-2xl font-bold text-green-400">{efficiency}%</div>
+                <div className="text-lg font-bold text-green-400">{efficiency}%</div>
              </div>
              
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <Home size={14} /> Fechados
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <Home size={12} /> Fechados
                 </div>
-                <div className="text-2xl font-bold text-yellow-400">{analytics.totalFechados.toLocaleString()}</div>
+                <div className="text-lg font-bold text-yellow-400">{analytics.totalFechados.toLocaleString()}</div>
              </div>
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <XCircle size={14} /> Recusas
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <XCircle size={12} /> Recusas
                 </div>
-                <div className="text-2xl font-bold text-red-400">{analytics.totalRecusas.toLocaleString()}</div>
+                <div className="text-lg font-bold text-red-400">{analytics.totalRecusas.toLocaleString()}</div>
              </div>
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <AlertCircle size={14} /> Resgates
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <AlertCircle size={12} /> Resgates
                 </div>
-                <div className="text-2xl font-bold text-orange-400">{analytics.totalResgates.toLocaleString()}</div>
+                <div className="text-lg font-bold text-orange-400">{analytics.totalResgates.toLocaleString()}</div>
              </div>
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-2">
-                    <Droplet size={14} /> Larvicida (g)
+             <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-1">
+                    <Droplet size={12} /> Larvicida (g)
                 </div>
-                <div className="text-2xl font-bold text-purple-400">{analytics.totalLarvicida.toFixed(1)}</div>
+                <div className="text-lg font-bold text-purple-400">{analytics.totalLarvicida.toFixed(1)}</div>
              </div>
           </div>
 

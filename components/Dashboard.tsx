@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell
@@ -7,7 +6,7 @@ import {
 import { 
   UploadCloud, BarChart2, Target, Briefcase, Droplet, 
   TrendingUp, Home, Users, AlertTriangle, ClipboardList, PieChart as PieIcon, MapPin, FileText,
-  Stethoscope, FileCheck, Clock, UserX, Activity
+  Stethoscope, FileCheck, Clock, UserX, Activity, SlidersHorizontal, ArrowLeft, ChevronRight, CheckCircle, Info, Database, Sparkles, Smartphone, Monitor, ChevronUp, ChevronDown, X
 } from 'lucide-react';
 import { ProductionData, FilterState, GoalSettings } from '../types';
 import { processDataFile, calculateAnalytics, COLORS } from '../utils';
@@ -16,30 +15,26 @@ import { GoalModal } from './GoalModal';
 import { generatePDFReport } from './ReportGenerator';
 import { AgentDetailsModal } from './AgentDetailsModal';
 
-// --- Custom Tooltip Components ---
+// --- Custom Tooltip Components for Mobile ---
 
 const CustomBarTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-        // Attempt to find extra data in the payload (like Supervisor for agents)
         const data = payload[0].payload;
         const total = payload.reduce((sum: number, entry: any) => sum + (entry.value || 0), 0);
 
         return (
-            <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 p-4 rounded-xl shadow-2xl z-50 min-w-[200px]">
-                <div className="border-b border-slate-700 pb-2 mb-2">
-                    <p className="font-bold text-slate-100 text-base">{label}</p>
+            <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 p-3 rounded-xl shadow-xl z-50 min-w-[160px] text-xs">
+                <div className="border-b border-slate-700 pb-1.5 mb-1.5">
+                    <p className="font-bold text-slate-100">{label}</p>
                     {data.Supervisor && (
-                        <p className="text-xs text-slate-400">Sup: {data.Supervisor}</p>
-                    )}
-                    {data.Agentes && (
-                        <p className="text-xs text-slate-400">Agentes Ativos: {data.Agentes.size || data.Agentes.length}</p>
+                        <p className="text-[10px] text-slate-400">Sup: {data.Supervisor}</p>
                     )}
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                     {payload.map((entry: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between text-sm gap-4">
-                            <span className="flex items-center gap-2 text-slate-300">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }}></span>
+                        <div key={index} className="flex items-center justify-between gap-4">
+                            <span className="flex items-center gap-1.5 text-slate-300">
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
                                 {entry.name}:
                             </span>
                             <span className="font-mono font-bold text-slate-100">
@@ -48,9 +43,9 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
                         </div>
                     ))}
                     {payload.length > 1 && (
-                        <div className="border-t border-slate-700 mt-2 pt-2 flex items-center justify-between text-sm">
-                            <span className="font-semibold text-slate-400">Total Visitas:</span>
-                            <span className="font-mono font-bold text-white">{total.toLocaleString()}</span>
+                        <div className="border-t border-slate-700 mt-1.5 pt-1.5 flex items-center justify-between font-semibold">
+                            <span className="text-slate-400">Total:</span>
+                            <span className="font-mono text-white">{total.toLocaleString()}</span>
                         </div>
                     )}
                 </div>
@@ -66,20 +61,20 @@ const CustomPieTooltip = ({ active, payload }: any) => {
         const percent = (data.payload as any).percent || 0;
 
         return (
-            <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 p-4 rounded-xl shadow-2xl z-50">
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: data.fill }}></span>
-                    <p className="font-bold text-slate-100 text-base">
+            <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 p-3 rounded-xl shadow-xl z-50 text-xs">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.fill }}></span>
+                    <p className="font-bold text-slate-100">
                         {{ 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' }[data.name || ''] || data.name}
                     </p>
                 </div>
-                <div className="space-y-1 text-sm text-slate-300">
-                    <div className="flex justify-between gap-6">
-                        <span>Quantidade:</span>
+                <div className="space-y-1 text-slate-300">
+                    <div className="flex justify-between gap-4">
+                        <span>Qtd:</span>
                         <span className="font-mono font-bold text-white">{data.value?.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between gap-6">
-                        <span>Percentual:</span>
+                    <div className="flex justify-between gap-4">
+                        <span>Perc:</span>
                         <span className="font-mono font-bold text-blue-400">{(percent * 100).toFixed(1)}%</span>
                     </div>
                 </div>
@@ -89,12 +84,157 @@ const CustomPieTooltip = ({ active, payload }: any) => {
     return null;
 };
 
+// --- Mock Demo Data ---
+const generateDemoData = (): ProductionData[] => {
+  const supervisors = ["Cláudio Silva", "Marcia Souza", "Renato Alencar"];
+  const agents = [
+    { name: "Carlos Drummond", sup: "Cláudio Silva" },
+    { name: "Cecília Meireles", sup: "Cláudio Silva" },
+    { name: "Machado Assis", sup: "Marcia Souza" },
+    { name: "Clarice Lispector", sup: "Marcia Souza" },
+    { name: "Guimarães Rosa", sup: "Renato Alencar" },
+    { name: "Manuel Bandeira", sup: "Renato Alencar" }
+  ];
+  const bairrosList = ["Centro Norte", "Alvorada I", "Primavera", "Centro sul", "Nossa Senhora das Graças", "Limoeiro", "Timirim"];
+  const cycles = ["Ciclo 03/2026", "Ciclo 04/2026"];
+  const months = ["Junho", "Julho"];
+  
+  const demoList: ProductionData[] = [];
+  
+  // Create 45 days of production records
+  for (let i = 0; i < 45; i++) {
+    const dateObj = new Date();
+    dateObj.setDate(dateObj.getDate() - i);
+    const dateISO = dateObj.toISOString().split('T')[0];
+    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+    
+    agents.forEach(agent => {
+      // 10% chance of absence on weekdays
+      let pendencia = "Sem Pendência";
+      let totalT = 0, fechado = 0, recusa = 0, resgate = 0;
+      let imTrat = 0, depElim = 0, larvicida = 0;
+      let r = 0, tb = 0, com = 0, pe = 0, o = 0;
+      let obs = "";
+
+      if (isWeekend) {
+        return; // No work on weekends
+      }
+      
+      const randAbsence = Math.random();
+      if (randAbsence < 0.08) {
+        const absences = ["Atestado Médico", "Declaração comparecimento", "Consulta Odonto", "Compensação BH"];
+        pendencia = absences[Math.floor(randAbsence * absences.length * 12.5)];
+        obs = "Ocorrência registrada no RH pelo supervisor.";
+      } else if (randAbsence < 0.11) {
+        pendencia = "Falta Não Justificada";
+        obs = "Agente não compareceu ao serviço, sem justificativa prévia.";
+      } else {
+        // High quality production day
+        totalT = Math.floor(20 + Math.random() * 12); // 20 - 32 visited
+        fechado = Math.floor(Math.random() * 4); // 0-3 closed
+        recusa = Math.floor(Math.random() * 2); // 0-1 refusal
+        resgate = Math.floor(Math.random() * 3); // 0-2 rescue
+        
+        imTrat = Math.floor(5 + Math.random() * 8); // 5-12 treated
+        depElim = Math.floor(Math.random() * 4); 
+        larvicida = Math.random() * 15; // larvicida grams
+
+        // Distribute property types visited
+        r = Math.floor(totalT * 0.7);
+        tb = Math.floor(totalT * 0.15);
+        com = Math.floor(totalT * 0.1);
+        pe = Math.floor(Math.random() * 2);
+        o = totalT - (r + tb + com + pe);
+        if (o < 0) o = 0;
+
+        if (Math.random() < 0.15) {
+          pendencia = "Chuva forte no período da tarde";
+          obs = "Equipe abrigada temporariamente. Retomou atividades logo em seguida.";
+        }
+      }
+
+      // Random cycle and month
+      const cycleIdx = i < 22 ? 0 : 1;
+
+      demoList.push({
+        Supervisor: agent.sup,
+        Agente: agent.name,
+        Ciclo: cycles[cycleIdx],
+        Mes: months[cycleIdx],
+        Bairro: bairrosList[Math.floor(Math.random() * bairrosList.length)],
+        Atividade: "Tratamento Focal",
+        DataISO: dateISO,
+        Data: dateISO.split('-').reverse().join('/'),
+        Total_T: totalT,
+        Fechado: fechado,
+        Recusa: recusa,
+        Resgate: resgate,
+        Im_Trat: imTrat,
+        Dep_Elim: depElim,
+        Larvicida: larvicida,
+        A1: Math.floor(Math.random() * 2),
+        A2: Math.floor(Math.random() * 3),
+        B: Math.floor(Math.random() * 4),
+        C: Math.floor(Math.random() * 2),
+        D1: Math.floor(Math.random() * 2),
+        D2: Math.floor(Math.random() * 1),
+        E: Math.floor(Math.random() * 3),
+        R: r,
+        Comercio: com,
+        Tb: tb,
+        PE: pe,
+        O: o,
+        Pendencias: pendencia,
+        Observacao: obs
+      });
+    });
+  }
+
+  return demoList;
+};
+
+
 export const Dashboard: React.FC = () => {
     const [rawData, setRawData] = useState<ProductionData[]>([]);
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'property' | 'teams' | 'issues' | 'neighborhoods' | 'hr'>('overview');
+    
+    // Mobile navigation tabs: 'overview' (Visão Geral), 'quality' (Tratamento/Saúde), 'neighborhoods' (Bairros), 'teams' (Supervisores), 'more' (RH & Pendências)
+    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'neighborhoods' | 'teams' | 'more'>('overview');
+    const [innerManagementTab, setInnerManagementTab] = useState<'hr' | 'issues'>('hr');
+    
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+    const [showPwaGuide, setShowPwaGuide] = useState(false);
+    
+    // User selected visual format mode (Simulator on right, or clean immersive full screen)
+    const [viewMode, setViewMode] = useState<'simulator' | 'full'>('simulator');
+    const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+    // Simulated Clock for status bar
+    const [clockString, setClockString] = useState("09:30");
+
+    useEffect(() => {
+        // Detect actual mobile screen or viewports
+        const checkDevice = () => {
+            setIsMobileDevice(window.innerWidth < 768);
+        };
+        checkDevice();
+        window.addEventListener('resize', checkDevice);
+        
+        // Timer for virtual clock status bar
+        const timer = setInterval(() => {
+            const now = new Date();
+            const hrs = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            setClockString(`${hrs}:${mins}`);
+        }, 1000);
+
+        return () => {
+            window.removeEventListener('resize', checkDevice);
+            clearInterval(timer);
+        };
+    }, []);
 
     const [goals, setGoals] = useState<GoalSettings>({
         trabalhados: 1000,
@@ -111,6 +251,13 @@ export const Dashboard: React.FC = () => {
         ano: 'Todos'
     });
 
+    const [localFilters, setLocalFilters] = useState<FilterState>({ ...filters });
+
+    // Synchronize local filter sheet state whenever global filters change
+    useEffect(() => {
+        setLocalFilters({ ...filters });
+    }, [filters]);
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -120,10 +267,18 @@ export const Dashboard: React.FC = () => {
             setRawData(data);
         } catch (error) {
             console.error("Error processing file", error);
-            alert("Error processing file. Please ensure it is a valid Excel/CSV file.");
+            alert("Erro ao processar o arquivo. Certifique-se de que é um arquivo Excel ou CSV de produção válido.");
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleLoadDemoData = () => {
+        setLoading(true);
+        setTimeout(() => {
+            setRawData(generateDemoData());
+            setLoading(false);
+        }, 800);
     };
 
     // Filter used for the main dashboard display
@@ -139,13 +294,22 @@ export const Dashboard: React.FC = () => {
 
     const analytics = useMemo(() => calculateAnalytics(filteredData, goals), [filteredData, goals]);
 
+    // Track expanded neighborhood cards
+    const [expandedNeighborhoods, setExpandedNeighborhoods] = useState<Record<string, boolean>>({});
+
+    const toggleNeighborhood = (name: string) => {
+        setExpandedNeighborhoods(prev => ({
+            ...prev,
+            [name]: !prev[name]
+        }));
+    };
+
     // Data for the Agent Modal - filters by Year/Supervisor but IGNORES Month/Cycle to show full history
     const selectedAgentData = useMemo(() => {
         if (!selectedAgent) return [];
         return rawData.filter(item => {
             const matchesAgent = item.Agente === selectedAgent;
             const matchesYear = filters.ano === 'Todos' || item.DataISO.startsWith(filters.ano);
-            // Optionally enforce supervisor match if supervisor filter is active, though Agent name is usually unique
             const matchesSupervisor = filters.supervisor === 'Todos' || item.Supervisor === filters.supervisor;
             
             return matchesAgent && matchesYear && matchesSupervisor;
@@ -199,466 +363,1089 @@ export const Dashboard: React.FC = () => {
         generatePDFReport(analytics, pendenciasList, filters, filteredData);
     };
 
-    if (rawData.length === 0) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-                <div className="max-w-md w-full bg-slate-900 border border-slate-800 shadow-2xl rounded-2xl p-8 text-center">
-                    <div className="mx-auto h-20 w-20 bg-slate-800 text-blue-500 rounded-full flex items-center justify-center mb-6 ring-1 ring-slate-700">
-                        <UploadCloud size={40} />
-                    </div>
-                    <h2 className="text-3xl font-bold text-white mb-3">Dashboard Produção</h2>
-                    <p className="text-slate-400 mb-8">Carregue o arquivo de dados (CSV/Excel) para gerar a análise completa.</p>
-                    <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg shadow-blue-900/50 hover:shadow-blue-900/30 transform hover:-translate-y-0.5">
-                        <span className="flex items-center justify-center gap-2">
-                            <UploadCloud size={20} />
-                            Selecionar Arquivo
-                        </span>
-                        <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
-                    </label>
-                    {loading && <div className="mt-6 flex justify-center"><div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>}
-                </div>
-            </div>
-        );
-    }
+    const handleApplyFilters = () => {
+        setFilters({ ...localFilters });
+        setIsFilterSheetOpen(false);
+    };
+
+    const handleResetFilters = () => {
+        const reseted = {
+            supervisor: 'Todos',
+            agente: 'Todos',
+            ciclo: 'Todos',
+            mes: 'Todos',
+            ano: 'Todos'
+        };
+        setLocalFilters(reseted);
+        setFilters(reseted);
+        setIsFilterSheetOpen(false);
+    };
+
+    const activeFiltersCount = useMemo(() => {
+        return Object.entries(filters).filter(([key, value]) => value !== 'Todos').length;
+    }, [filters]);
 
     const CHART_GRID_COLOR = "#334155";
     const CHART_TEXT_COLOR = "#94a3b8";
 
     const getCoverageColor = (percent: number) => {
-        if (percent >= 80) return 'bg-green-500';
-        if (percent >= 60) return 'bg-yellow-500';
-        return 'bg-red-500';
+        if (percent >= 80) return 'text-green-400 bg-green-500/10 border-green-500/20';
+        if (percent >= 60) return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
+        return 'text-red-400 bg-red-500/10 border-red-500/20';
     };
 
-    return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
-            {/* Header */}
-            <header className="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-30 px-6 py-4 shadow-lg backdrop-blur-md">
-                <div className="max-w-7xl mx-auto flex flex-col xl:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 w-full xl:w-auto">
-                        <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl text-white shadow-lg shadow-blue-900/50">
-                            <BarChart2 size={24} />
+    const getCoverageProgressColor = (percent: number) => {
+        if (percent >= 80) return 'bg-gradient-to-r from-green-500 to-emerald-500';
+        if (percent >= 60) return 'bg-gradient-to-r from-yellow-500 to-amber-500';
+        return 'bg-gradient-to-r from-red-500 to-rose-500';
+    };
+
+    // Mobile UI Core Content
+    const renderMobileAppContent = () => {
+        // --- SCREEN A: WELCOME / UPLOAD ---
+        if (rawData.length === 0) {
+            return (
+                <div className="flex-1 flex flex-col justify-between p-6 bg-slate-950 text-slate-100 overflow-y-auto custom-scrollbar">
+                    {/* Upper decorative elements */}
+                    <div className="pt-8 text-center space-y-6">
+                        <div className="mx-auto h-20 w-20 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 rounded-3xl flex items-center justify-center shadow-xl shadow-indigo-950/40 relative">
+                            <Activity className="text-white animate-pulse" size={40} />
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-4 w-4 bg-cyan-500 border border-slate-950"></span>
+                            </span>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <h2 className="text-3xl font-extrabold text-white tracking-tight">ProdAnalytics</h2>
+                            <p className="text-sm text-slate-400 max-w-xs mx-auto">Sua plataforma móvel de monitoramento epidemiológico e produtividade de vetores.</p>
+                        </div>
+
+                        {/* Feature Badges */}
+                        <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto pt-4 text-left">
+                            <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
+                                <Sparkles className="text-blue-400 shrink-0 mt-0.5" size={16} />
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-200">Visão Geral</h4>
+                                    <p className="text-[10px] text-slate-500">Métricas e ranking em tempo real.</p>
+                                </div>
+                            </div>
+                            <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-xl flex items-start gap-2.5">
+                                <MapPin className="text-teal-400 shrink-0 mt-0.5" size={16} />
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-200">Bairros</h4>
+                                    <p className="text-[10px] text-slate-500">Acompanhe a cobertura de metas.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Import / Trigger Options */}
+                    <div className="space-y-4 pb-8 pt-8 max-w-sm mx-auto w-full">
+                        <label className="block w-full cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-4 px-6 rounded-2xl text-center shadow-lg shadow-indigo-950/50 transition-all transform active:scale-[0.98]">
+                            <span className="flex items-center justify-center gap-2 text-sm uppercase tracking-wider font-bold">
+                                <UploadCloud size={18} />
+                                Arquivo de Produção
+                            </span>
+                            <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
+                        </label>
+
+                        <button 
+                            onClick={handleLoadDemoData}
+                            className="w-full flex items-center justify-center gap-2 border border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 text-slate-300 font-semibold py-3.5 px-6 rounded-2xl text-sm transition-all shadow-sm active:scale-[0.98]"
+                        >
+                            <Database size={16} className="text-indigo-400" />
+                            Explorar Dados de Teste
+                        </button>
+
+                        <button 
+                            onClick={() => setShowPwaGuide(true)}
+                            className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-500/50 bg-indigo-950/20 hover:bg-indigo-950/50 text-indigo-300 font-bold py-3.5 px-6 rounded-2xl text-sm transition-all shadow-sm active:scale-[0.98] animate-pulse"
+                        >
+                            <Smartphone size={16} className="text-indigo-400" />
+                            Instalar no Celular (PWA)
+                        </button>
+
+                        {loading && (
+                            <div className="flex justify-center pt-2">
+                                <div className="flex items-center gap-2.5 bg-slate-900 border border-slate-800 py-2 px-4 rounded-full">
+                                    <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-xs text-slate-400 font-medium">Carregando painel móvel...</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // --- DASHBOARD CONTAINER SCREEN ---
+        return (
+            <div className="flex-1 flex flex-col bg-slate-950 text-slate-100 overflow-hidden relative">
+                {/* Simulated In-App Top Bar */}
+                <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 shrink-0 flex items-center justify-between z-10">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg text-white shadow">
+                            <Activity size={18} />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-white tracking-tight">ProdAnalytics</h1>
-                            <div className="flex gap-4 text-xs text-slate-400 font-medium mt-0.5">
-                                <span className="flex items-center gap-1.5"><Target size={14} className="text-blue-400"/> Meta: {goals.trabalhados}</span>
-                                <span className="flex items-center gap-1.5"><TrendingUp size={14} className="text-green-400"/> Diária: {goals.diariaMin}-{goals.diariaMax}</span>
-                            </div>
+                            <h2 className="text-sm font-bold text-white tracking-tight leading-none">ProdAnalytics</h2>
+                            <p className="text-[10px] text-slate-400 font-medium mt-1 shrink truncate max-w-[120px]">
+                                {activeFiltersCount > 0 ? `${activeFiltersCount} Filtro(s) ativo(s)` : 'Todos os dados'}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-3 w-full xl:w-auto items-center justify-end">
+                    <div className="flex items-center gap-1.5">
+                        <button 
+                            onClick={() => setIsFilterSheetOpen(true)}
+                            className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
+                                activeFiltersCount > 0 
+                                ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/40 shadow-sm' 
+                                : 'bg-slate-800 text-slate-300 border-slate-700/60'
+                            }`}
+                        >
+                            <SlidersHorizontal size={14} />
+                            Filtros
+                            {activeFiltersCount > 0 && (
+                                <span className="h-4 w-4 rounded-full bg-indigo-500 text-white text-[9px] flex items-center justify-center font-black">
+                                    {activeFiltersCount}
+                                </span>
+                            )}
+                        </button>
+                        
+                        <button 
+                            onClick={() => setShowGoalModal(true)}
+                            className="p-2 bg-slate-800 border border-slate-700/60 rounded-lg text-slate-300 hover:text-white"
+                            title="Meta"
+                        >
+                            <Target size={14} />
+                        </button>
+                        
+                        <button 
+                            onClick={() => setShowPwaGuide(true)}
+                            className="p-2 bg-indigo-900/40 border border-indigo-700/50 rounded-lg text-indigo-400 hover:text-indigo-350 hover:bg-indigo-900/60"
+                            title="Instalar no Celular"
+                        >
+                            <Smartphone size={14} />
+                        </button>
+
                         <button 
                             onClick={handleExportPDF}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-lg border border-slate-700 flex items-center gap-2 text-sm font-medium transition-colors"
+                            className="p-2 bg-slate-800 border border-slate-700/60 rounded-lg text-emerald-400 hover:bg-slate-700"
+                            title="PDF"
                         >
-                            <FileText size={16} /> Relatório PDF
-                        </button>
-
-                        {['Ano', 'Supervisor', 'Agente', 'Ciclo', 'Mes'].map(filterKey => (
-                            <div key={filterKey} className="relative">
-                                <select 
-                                    className="appearance-none bg-slate-800 border border-slate-700 text-sm font-medium text-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-8 py-2.5 shadow-sm outline-none transition-all cursor-pointer hover:bg-slate-700"
-                                    value={(filters as any)[filterKey.toLowerCase()]}
-                                    onChange={(e) => setFilters({...filters, [filterKey.toLowerCase()]: e.target.value})}
-                                >
-                                    <option value="Todos">{filterKey}: Todos</option>
-                                    {(options as any)[filterKey.toLowerCase() === 'supervisor' ? 'supervisores' : filterKey.toLowerCase() === 'mes' ? 'meses' : filterKey.toLowerCase() === 'ano' ? 'anos' : filterKey.toLowerCase() + 's']?.map((opt: string) => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        ))}
-                        <button 
-                            onClick={() => setShowGoalModal(true)} 
-                            className="p-2.5 text-slate-400 hover:bg-slate-800 hover:text-blue-400 rounded-lg transition-colors border border-transparent hover:border-slate-700" 
-                        >
-                            <Target size={20} />
+                            <FileText size={14} />
                         </button>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            {/* Navigation Tabs */}
-            <div className="bg-slate-900 border-b border-slate-800 shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
-                        {[
-                            { id: 'overview', label: 'Visão Geral', icon: BarChart2 },
-                            { id: 'quality', label: 'Qualidade', icon: Droplet },
-                            { id: 'property', label: 'Imóveis', icon: Home },
-                            { id: 'neighborhoods', label: 'Bairros', icon: MapPin },
-                            { id: 'teams', label: 'Equipes', icon: Users },
-                            { id: 'hr', label: 'Recursos Humanos', icon: Activity },
-                            { id: 'issues', label: 'Pendências', icon: AlertTriangle, count: pendenciasList.length }
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`
-                                    whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors
-                                    ${activeTab === tab.id 
-                                        ? 'border-blue-500 text-blue-400' 
-                                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'}
-                                `}
-                            >
-                                <tab.icon size={16} />
-                                {tab.label}
-                                {tab.count !== undefined && tab.count > 0 && (
-                                    <span className="ml-1.5 py-0.5 px-2 rounded-full text-xs font-medium bg-red-900/50 text-red-400 border border-red-800">
-                                        {tab.count}
-                                    </span>
-                                )}
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-            </div>
-
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-                {/* Tab Content: Overview */}
-                {activeTab === 'overview' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                            <KpiCard title="Trabalhados" value={analytics.totalTrabalhados.toLocaleString()} sub={`Meta: ${(analytics.rankingAgentes.length * goals.trabalhados).toLocaleString()}`} icon={Briefcase} color="blue" />
-                            <KpiCard title="Média Diária" value={analytics.mediaDiaria} sub={`Alvo: ${goals.diariaMin}-${goals.diariaMax}`} icon={TrendingUp} color={parseFloat(analytics.mediaDiaria) >= goals.diariaMin ? 'green' : 'red'} />
-                            <KpiCard title="Eficiência" value={`${analytics.percTrabalhados.toFixed(1)}%`} sub={`Perda: ${analytics.percPerda.toFixed(1)}%`} icon={PieIcon} color={analytics.percTrabalhados >= goals.eficienciaMin ? 'green' : 'orange'} />
-                            <KpiCard title="Imóveis Fechados" value={analytics.totalFechados.toLocaleString()} sub={`Recusas: ${analytics.totalRecusas.toLocaleString()}`} icon={Home} color="slate" />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-                            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 flex flex-col overflow-hidden h-full">
-                                <div className="p-4 border-b border-slate-800 bg-slate-800/50 flex justify-between items-center backdrop-blur-sm">
-                                    <h3 className="font-bold text-slate-100">Ranking Produtividade</h3>
-                                    <span className="text-xs font-medium px-2 py-1 bg-slate-700 text-slate-300 rounded border border-slate-600">Top Agentes</span>
+                {/* Filter chip shortcuts bar (horizontal scroll) */}
+                {activeFiltersCount > 0 && (
+                    <div className="bg-slate-900 border-b border-slate-800/80 px-4 py-1.5 shrink-0 flex items-center gap-2 overflow-x-auto text-[10px] custom-scrollbar">
+                        <span className="text-slate-500 shrink-0 font-medium">Filtros:</span>
+                        {Object.entries(filters).map(([key, value]) => {
+                            if (value === 'Todos') return null;
+                            const filterLabel = {
+                                supervisor: 'Sup',
+                                agente: 'Ag',
+                                ciclo: 'Cicl',
+                                mes: 'Mês',
+                                ano: 'Ano'
+                            }[key] || key;
+                            return (
+                                <div key={key} className="flex items-center gap-1 bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-full shrink-0">
+                                    <span className="text-[9px] text-indigo-400 font-bold uppercase">{filterLabel}:</span>
+                                    <span>{value}</span>
+                                    <button 
+                                        className="text-slate-500 hover:text-white shrink-0 font-bold ml-0.5 text-[11px]" 
+                                        onClick={() => setFilters({ ...filters, [key]: 'Todos' })}
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
-                                <div className="overflow-y-auto flex-1 p-2 space-y-1 custom-scrollbar">
+                            );
+                        })}
+                        <button 
+                            className="text-indigo-400 font-semibold shrink-0 underline"
+                            onClick={handleResetFilters}
+                        >
+                            Limpar todos
+                        </button>
+                    </div>
+                )}
+
+                {/* Core Scrollable Screen Content */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar pb-24">
+
+                    {/* --- TAB VIEW 1: OVERVIEW --- */}
+                    {activeTab === 'overview' && (
+                        <div className="space-y-6 animate-in fade-in duration-300">
+                            {/* KPI Metrics List (Optimized 2-Column Grid on Mobile) */}
+                            <div className="grid grid-cols-2 gap-3.5">
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-sm">
+                                    <div className="flex justify-between items-start mb-1 text-slate-500">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">Trabalhados</span>
+                                        <Briefcase size={14} className="text-blue-400" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-100">{analytics.totalTrabalhados.toLocaleString()}</h3>
+                                    <p className="text-[9px] text-slate-500 mt-0.5 shrink truncate">Meta: {(analytics.rankingAgentes.length * goals.trabalhados).toLocaleString()}</p>
+                                </div>
+
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-sm">
+                                    <div className="flex justify-between items-start mb-1 text-slate-500">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">Média Diária</span>
+                                        <TrendingUp size={14} className="text-green-400" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-100">{analytics.mediaDiaria}</h3>
+                                    <p className="text-[9px] text-slate-500 mt-0.5 shrink truncate">Alvo: {goals.diariaMin}-{goals.diariaMax}</p>
+                                </div>
+
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-sm">
+                                    <div className="flex justify-between items-start mb-1 text-slate-500">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">Eficiência</span>
+                                        <PieIcon size={14} className="text-indigo-400" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-100">{analytics.percTrabalhados.toFixed(1)}%</h3>
+                                    <p className="text-[9px] text-slate-500 mt-0.5 shrink truncate">Perda: {analytics.percPerda.toFixed(1)}%</p>
+                                </div>
+
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-sm">
+                                    <div className="flex justify-between items-start mb-1 text-slate-500">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider">Imóveis Fechados</span>
+                                        <Home size={14} className="text-yellow-500" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-100">{analytics.totalFechados.toLocaleString()}</h3>
+                                    <p className="text-[9px] text-slate-500 mt-0.5 shrink truncate">Recusas: {analytics.totalRecusas.toLocaleString()}</p>
+                                </div>
+                            </div>
+
+                            {/* Top Perfomer List */}
+                            <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
+                                <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
+                                    <h3 className="font-bold text-slate-200 text-xs flex items-center gap-1.5"><Users size={14} className="text-blue-400"/> Ranking Produtividade</h3>
+                                    <span className="text-[9px] font-medium bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded">Agentes</span>
+                                </div>
+                                <div className="p-2 space-y-1 divide-y divide-slate-800/40">
                                     {analytics.rankingAgentes.map((agent, idx) => (
-                                        <div key={idx} className="group flex flex-col p-3 hover:bg-slate-800 rounded-lg transition-all border border-transparent hover:border-slate-700">
-                                            <div className="flex justify-between items-center mb-1.5">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${idx < 3 ? 'bg-yellow-900/30 text-yellow-500 ring-1 ring-yellow-700' : 'bg-slate-800 text-slate-500 ring-1 ring-slate-700'}`}>
+                                        <div 
+                                            key={idx} 
+                                            onClick={() => setSelectedAgent(agent.name)}
+                                            className="flex flex-col p-2.5 hover:bg-slate-800/40 rounded-lg transition-all border border-transparent cursor-pointer"
+                                        >
+                                            <div className="flex justify-between items-center mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                                                        idx === 0 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' : 
+                                                        idx === 1 ? 'bg-slate-300/10 text-slate-300 border border-slate-300/20' : 
+                                                        idx === 2 ? 'bg-amber-600/10 text-amber-500 border border-amber-500/20' : 
+                                                        'bg-slate-800 text-slate-500 border border-slate-700/80'
+                                                    }`}>
                                                         {idx + 1}
                                                     </div>
-                                                    <button 
-                                                        onClick={() => setSelectedAgent(agent.name)}
-                                                        className="text-sm font-semibold text-slate-200 truncate max-w-[120px] hover:text-blue-400 hover:underline text-left" 
-                                                        title="Ver detalhes do agente"
-                                                    >
-                                                        {agent.name}
-                                                    </button>
+                                                    <span className="text-xs font-semibold text-slate-200 tracking-tight truncate max-w-[140px]">{agent.name}</span>
                                                 </div>
-                                                <span className={`text-sm font-bold font-mono ${agent.StatusMeta ? 'text-green-400' : 'text-slate-500'}`}>{agent.Trabalhados}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-bold font-mono ${agent.StatusMeta ? 'text-green-400' : 'text-slate-400'}`}>
+                                                        {agent.Trabalhados}
+                                                    </span>
+                                                    <ChevronRight size={14} className="text-slate-600" />
+                                                </div>
                                             </div>
-                                            <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-700/50">
-                                                <div className={`h-full rounded-full transition-all duration-500 ${agent.StatusMeta ? 'bg-green-500' : 'bg-blue-500'}`} style={{width: `${Math.min(100, (agent.Trabalhados / goals.trabalhados) * 100)}%`}}></div>
+                                            <div className="w-full bg-slate-800 rounded-full h-1 mt-1 overflow-hidden">
+                                                <div className={`h-full rounded-full ${agent.StatusMeta ? 'bg-green-500' : 'bg-blue-500'}`} style={{width: `${Math.min(100, (agent.Trabalhados / goals.trabalhados) * 100)}%`}}></div>
                                             </div>
-                                            <div className="flex justify-between mt-2 text-[10px] text-slate-500 font-medium px-1">
-                                                <span>Média: {agent.MediaDiaria}/dia</span>
-                                                <span>Resg: {agent.Resgates}</span>
+                                            <div className="flex justify-between mt-1 text-[9px] text-slate-500">
+                                                <span>Diária: {agent.MediaDiaria}/dia</span>
+                                                <span>Recusas/Fech: {agent.Recusas}/{agent.Fechados}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 lg:col-span-2 flex flex-col h-full">
-                                <h3 className="font-bold text-slate-100 text-lg mb-6">Análise de Perda</h3>
-                                <div className="flex-1 w-full min-h-0">
+
+                            {/* Lost visits Chart on Mobile (horizontal scrolling canvas container) */}
+                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                                <h3 className="font-bold text-slate-200 text-xs mb-4">Métricas de Perda (Top 10 Agentes)</h3>
+                                <div className="w-full h-56 text-xs text-slate-400">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={analytics.rankingAgentes.slice(0, 20)} margin={{top: 10, right: 10, left: 0, bottom: 60}} barSize={20}>
+                                        <BarChart data={analytics.rankingAgentes.slice(0, 10)} margin={{top: 5, right: 0, left: -25, bottom: 5}} barSize={8}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
-                                            <XAxis dataKey="name" tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} interval={0} angle={-45} textAnchor="end" height={60} />
-                                            <YAxis tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
+                                            <XAxis dataKey="name" tick={{fontSize: 9, fill: CHART_TEXT_COLOR}} interval={0} angle={-35} textAnchor="end" height={40} />
+                                            <YAxis tick={{fontSize: 9, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
                                             <Tooltip content={<CustomBarTooltip />} cursor={{fill: '#1e293b'}} />
-                                            <Bar dataKey="Trabalhados" stackId="a" fill={COLORS.blue} radius={[0, 0, 4, 4]} />
+                                            <Bar dataKey="Trabalhados" stackId="a" fill={COLORS.blue} />
                                             <Bar dataKey="Fechados" stackId="a" fill={COLORS.yellow} />
-                                            <Bar dataKey="Recusas" stackId="a" fill={COLORS.red} radius={[4, 4, 0, 0]} />
+                                            <Bar dataKey="Recusas" stackId="a" fill={COLORS.red} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Tab Content: Quality */}
-                {activeTab === 'quality' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                            <KpiCard title="Imóveis Tratados" value={analytics.totalImTrat.toLocaleString()} sub="Ação Corretiva" icon={Droplet} color="teal" />
-                            <KpiCard title="Depósitos Eliminados" value={analytics.totalDepElim.toLocaleString()} sub="Controle Mecânico" icon={Target} color="red" />
-                            <KpiCard title="Uso Larvicida (g)" value={analytics.totalLarvicida.toFixed(1)} sub="Controle Químico" icon={ClipboardList} color="purple" />
-                        </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 h-96">
-                                <h3 className="font-bold text-slate-100 text-lg mb-6">Tipos de Depósitos (A1 - E)</h3>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={analytics.chartDepositos}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
-                                        <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                        <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
-                                        <Bar dataKey="value" fill={COLORS.orange} radius={[4,4,0,0]} name="Qtd" barSize={40} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 h-96">
-                                <h3 className="font-bold text-slate-100 text-lg mb-6">Top Agentes - Tratamento Focal</h3>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={[...analytics.rankingAgentes].sort((a,b)=>b.Im_Trat - a.Im_Trat).slice(0, 10)} layout="vertical" margin={{left: 20}}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_GRID_COLOR} />
-                                        <XAxis type="number" tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                        <YAxis dataKey="name" type="category" width={100} tick={{fontSize:11, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                        <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
-                                        <Bar dataKey="Im_Trat" fill={COLORS.teal} radius={[0,4,4,0]} name="Imóveis Tratados" barSize={20} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
-                {/* Tab Content: Neighborhoods */}
-                {activeTab === 'neighborhoods' && (
-                    <div className="space-y-4 animate-in fade-in duration-500">
-                        {/* Legend */}
-                        <div className="flex flex-wrap gap-4 items-center justify-end text-sm text-slate-400">
-                            <span className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full bg-green-500"></span> Cobertura ≥ 80%
-                            </span>
-                            <span className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full bg-yellow-500"></span> 60% a 79.9%
-                            </span>
-                            <span className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full bg-red-500"></span> &lt; 60%
-                            </span>
-                        </div>
+                    {/* --- TAB VIEW 2: QUALITY / SAÚDE --- */}
+                    {activeTab === 'quality' && (
+                        <div className="space-y-6 animate-in fade-in duration-300">
+                            {/* Mobile KPI list */}
+                            <div className="space-y-3">
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Imóveis Tratados</p>
+                                        <h3 className="text-xl font-extrabold text-teal-400 mt-1">{analytics.totalImTrat.toLocaleString()}</h3>
+                                        <p className="text-[9px] text-slate-500 mt-0.5">Ações corretivas focais realizadas</p>
+                                    </div>
+                                    <div className="p-2.5 bg-teal-500/10 border border-teal-500/20 rounded-xl text-teal-400">
+                                        <Droplet size={18} />
+                                    </div>
+                                </div>
 
-                        <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden">
-                            <div className="px-6 py-5 border-b border-slate-800 bg-slate-800/50 flex justify-between items-center">
-                                <h3 className="font-bold text-teal-400 flex items-center gap-2">
-                                    <MapPin size={20} />
-                                    Cobertura por Bairro
-                                </h3>
-                                <span className="text-xs text-slate-500">
-                                    Baseado na meta de imóveis por ciclo
-                                </span>
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Depósitos Eliminados</p>
+                                        <h3 className="text-xl font-extrabold text-red-400 mt-1">{analytics.totalDepElim.toLocaleString()}</h3>
+                                        <p className="text-[9px] text-slate-500 mt-0.5">Controle mecânico de criadouros</p>
+                                    </div>
+                                    <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
+                                        <Target size={18} />
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Uso Larvicida (g)</p>
+                                        <h3 className="text-xl font-extrabold text-purple-400 mt-1">{analytics.totalLarvicida.toFixed(1)}g</h3>
+                                        <p className="text-[9px] text-slate-500 mt-0.5">Inseticidas e químicos aplicados</p>
+                                    </div>
+                                    <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl text-purple-400">
+                                        <ClipboardList size={18} />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left text-slate-400">
-                                    <thead className="text-xs text-slate-500 uppercase bg-slate-800/50 border-b border-slate-700">
-                                        <tr>
-                                            <th className="px-6 py-4 font-semibold w-1/4">Bairro</th>
-                                            <th className="px-6 py-4 font-semibold text-center">Visitados / Meta</th>
-                                            <th className="px-6 py-4 font-semibold w-1/4">Progresso Cobertura</th>
-                                            <th className="px-6 py-4 font-semibold text-center">Res</th>
-                                            <th className="px-6 py-4 font-semibold text-center">TB</th>
-                                            <th className="px-6 py-4 font-semibold text-center">Com</th>
-                                            <th className="px-6 py-4 font-semibold text-center">Outros</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800/50">
-                                        {analytics.neighborhoods.map((b, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-slate-200">{b.name}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className="text-slate-200 font-bold">{b.visited}</span> 
-                                                    <span className="text-slate-600 mx-1">/</span> 
-                                                    <span className="text-slate-500">{b.target > 0 ? b.target : '-'}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex-1 bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700/50">
-                                                            <div 
-                                                                className={`h-full rounded-full transition-all duration-700 ${getCoverageColor(b.coverage)}`} 
-                                                                style={{width: `${Math.min(100, b.coverage)}%`}}
-                                                            ></div>
-                                                        </div>
-                                                        <span className="text-xs font-bold min-w-[3rem] text-right">{b.coverage.toFixed(1)}%</span>
+
+                            {/* Deposits chart */}
+                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                                <h3 className="font-bold text-slate-200 text-xs mb-4">Tipos de Depósitos Identificados</h3>
+                                <div className="w-full h-52 text-xs">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={analytics.chartDepositos} margin={{left: -25}}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+                                            <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                            <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
+                                            <Bar dataKey="value" fill={COLORS.orange} radius={[2,2,0,0]} name="Qtd" barSize={15} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            {/* Property Division list */}
+                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                                <h3 className="font-bold text-slate-200 text-xs mb-4">Tipos de Imóveis</h3>
+                                <div className="space-y-2">
+                                    {analytics.chartImoveis.map((item, idx) => (
+                                        <div key={item.name} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-800/60 bg-slate-950/40">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-3 h-3 rounded-full" style={{backgroundColor: Object.values(COLORS)[idx % Object.values(COLORS).length]}}></div>
+                                                <span className="text-xs font-semibold text-slate-200">
+                                                    {{ 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' }[item.name] || item.name}
+                                                </span>
+                                            </div>
+                                            <span className="font-mono text-xs font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                                {item.value.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+
+                    {/* --- TAB VIEW 3: NEIGHBORHOODS --- */}
+                    {activeTab === 'neighborhoods' && (
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                            {/* Short legend */}
+                            <div className="flex justify-between items-center text-[10px] bg-slate-900 border border-slate-800 p-2.5 rounded-xl font-semibold">
+                                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> ≥80%</span>
+                                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span> 60-79%</span>
+                                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-400"></span> &lt;60%</span>
+                            </div>
+
+                            <p className="text-[10px] text-slate-500 mt-1 italic font-medium">Toque nos bairros para ver o detalhamento de imóveis visitados.</p>
+
+                            {/* Neighborhood cards feed */}
+                            <div className="space-y-2.5">
+                                {analytics.neighborhoods.map((b, idx) => {
+                                    const isExpanded = !!expandedNeighborhoods[b.name];
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm transition-all duration-200"
+                                        >
+                                            {/* Primary header of neighborhood */}
+                                            <div 
+                                                onClick={() => toggleNeighborhood(b.name)}
+                                                className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/20 active:bg-slate-800/40"
+                                            >
+                                                <div className="space-y-1 select-none pr-2 max-w-[180px]">
+                                                    <h4 className="text-xs font-bold text-slate-200 truncate leading-tight">{b.name}</h4>
+                                                    <p className="text-[10px] text-slate-500 font-medium font-mono">
+                                                        Visitados: <span className="text-slate-300 font-bold">{b.visited}</span> / {b.target > 0 ? b.target : '-'}
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${getCoverageColor(b.coverage)}`}>
+                                                        {b.coverage.toFixed(1)}%
+                                                    </span>
+                                                    {isExpanded ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
+                                                </div>
+                                            </div>
+
+                                            {/* Expandable progress slider bar */}
+                                            <div className="px-3.5 pb-3">
+                                                <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                                                    <div className={`h-full rounded-full ${getCoverageProgressColor(b.coverage)}`} style={{width: `${Math.min(100, b.coverage)}%`}}></div>
+                                                </div>
+                                            </div>
+
+                                            {/* Expanded Detailed properties info */}
+                                            {isExpanded && (
+                                                <div className="bg-slate-950/60 border-t border-slate-800/60 p-3.5 space-y-2 text-[11px] animate-in slide-in-from-top-2 duration-200">
+                                                    <div className="flex justify-between items-center font-bold text-[10px] text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-1 mb-1.5">
+                                                        <span>Categoria de Imóvel</span>
+                                                        <span>Visitados</span>
                                                     </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.R}</td>
-                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.Tb}</td>
-                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.Comercio}</td>
-                                                <td className="px-6 py-4 text-center text-slate-400">{b.propertyTypes.O}</td>
-                                            </tr>
-                                        ))}
-                                        {analytics.neighborhoods.length === 0 && (
-                                            <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">Nenhum dado de bairro encontrado. Verifique a coluna "Bairro" no arquivo.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                                        <div className="flex justify-between text-slate-300">
+                                                            <span>Residencial (R):</span>
+                                                            <span className="font-bold font-mono text-slate-400">{b.propertyTypes.R}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-slate-300">
+                                                            <span>Terreno Baldio (TB):</span>
+                                                            <span className="font-bold font-mono text-slate-400">{b.propertyTypes.Tb}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-slate-300">
+                                                            <span>Comercial (Com):</span>
+                                                            <span className="font-bold font-mono text-slate-400">{b.propertyTypes.Comercio}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-slate-300">
+                                                            <span>Ponto Estrat. (PE):</span>
+                                                            <span className="font-bold font-mono text-slate-400">{b.propertyTypes.PE}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-slate-300 col-span-2 pt-1 border-t border-slate-800/30">
+                                                            <span>Outros tipos (O):</span>
+                                                            <span className="font-bold font-mono text-slate-400">{b.propertyTypes.O}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {analytics.neighborhoods.length === 0 && (
+                                    <div className="text-center p-8 text-slate-500 text-xs">Nenhum bairro registrado.</div>
+                                )}
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Tab Content: Property */}
-                {activeTab === 'property' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-                        <div className="lg:col-span-2 bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-8 h-[500px] flex flex-col">
-                            <h3 className="font-bold text-slate-100 text-lg mb-2">Distribuição por Tipo de Imóvel</h3>
-                            <div className="flex-1">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={analytics.chartImoveis} cx="50%" cy="50%" innerRadius={80} outerRadius={140} paddingAngle={4} dataKey="value" stroke="none">
-                                            {analytics.chartImoveis.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index % Object.values(COLORS).length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip content={<CustomPieTooltip />} />
-                                    </PieChart>
-                                </ResponsiveContainer>
+
+                    {/* --- TAB VIEW 4: TEAMS --- */}
+                    {activeTab === 'teams' && (
+                        <div className="space-y-6 animate-in fade-in duration-300">
+                            {/* Supervisor Productivity metrics list */}
+                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                                <h3 className="font-bold text-slate-200 text-xs mb-4">Supervisores: Média Visitas por Agente</h3>
+                                <div className="w-full h-60 text-xs">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={analytics.rankingSupervisores} margin={{left: -25}}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+                                            <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                            <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
+                                            <Bar dataKey="MediaPorAgente" radius={[4,4,0,0]} name="Média por Agente" barSize={34}>
+                                                {analytics.rankingSupervisores.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.name === filters.supervisor ? COLORS.orange : COLORS.purple} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
-                        </div>
-                        <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6">
-                            <h3 className="font-bold text-slate-100 text-lg mb-6">Detalhes</h3>
-                            <div className="space-y-4">
-                                {analytics.chartImoveis.map((item, idx) => (
-                                    <div key={item.name} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-700">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-4 h-4 rounded-full shadow-sm" style={{backgroundColor: Object.values(COLORS)[idx % Object.values(COLORS).length]}}></div>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-slate-200">{{ 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' }[item.name] || item.name}</span>
+
+                            {/* Numerical Supervisor Roster */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                                <div className="p-4 border-b border-slate-800 bg-slate-800/10">
+                                    <h4 className="text-xs font-bold text-slate-200">Rendimento de Equipes</h4>
+                                </div>
+                                <div className="p-2.5 space-y-2">
+                                    {analytics.rankingSupervisores.map((row, idx) => (
+                                        <div key={idx} className="bg-slate-950/40 border border-slate-800/55 p-3 rounded-xl flex justify-between items-center">
+                                            <div className="space-y-0.5">
+                                                <h5 className="text-xs font-bold text-slate-200">{row.name}</h5>
+                                                <p className="text-[10px] text-slate-500 font-medium">
+                                                    Agentes Ativos: <span className="font-bold text-slate-400">{row.Agentes.size || row.Agentes.length}</span>
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase block leading-tight">Média / Agente</span>
+                                                <span className="font-mono text-sm font-black text-indigo-400">{row.MediaPorAgente} vis.</span>
                                             </div>
                                         </div>
-                                        <span className="font-bold text-slate-300 bg-slate-800 px-2 py-1 rounded text-sm border border-slate-700">{item.value.toLocaleString()}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Tab Content: Teams */}
-                {activeTab === 'teams' && (
-                    <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-8 animate-in fade-in duration-500">
-                        <h3 className="font-bold text-slate-100 text-lg mb-8">Comparativo de Produtividade: Supervisores</h3>
-                        <div className="h-96">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={analytics.rankingSupervisores} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
-                                    <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 12}} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                    <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
-                                    <Bar dataKey="MediaPorAgente" radius={[6,6,0,0]} barSize={60}>
-                                        {analytics.rankingSupervisores.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.name === filters.supervisor ? COLORS.orange : COLORS.purple} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                )}
-
-                {/* Tab Content: HR (Recursos Humanos) */}
-                {activeTab === 'hr' && (
-                    <div className="space-y-6 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                            <KpiCard title="Atestados" value={analytics.attendance.atestados} sub="Médicos" icon={Stethoscope} color="blue" />
-                            <KpiCard title="Declarações" value={analytics.attendance.declaracoes} sub="Comparecimento" icon={FileCheck} color="teal" />
-                            <KpiCard title="Consultas" value={analytics.attendance.consultas} sub="Agendadas" icon={Activity} color="purple" />
-                            <KpiCard title="Compensações" value={analytics.attendance.compensacoes} sub="Banco Horas" icon={Clock} color="orange" />
-                            <KpiCard title="Faltas" value={analytics.attendance.faltas} sub="Não Justificadas" icon={UserX} color="red" />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-1 bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 flex flex-col h-[400px]">
-                                <h3 className="font-bold text-slate-100 text-lg mb-6">Distribuição de Ausências</h3>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={hrChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="value" stroke="none">
-                                            {hrChartData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9'}} />
-                                        <Legend layout="horizontal" verticalAlign="bottom" align="center" />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                            
-                            <div className="lg:col-span-2 bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 flex flex-col h-[400px]">
-                                <h3 className="font-bold text-slate-100 text-lg mb-6">Top Agentes: Ausências (Geral)</h3>
-                                <div className="flex-1 w-full min-h-0">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart 
-                                            data={[...analytics.rankingAgentes]
-                                                .map(a => ({
-                                                    name: a.name,
-                                                    totalAbsences: a.attendance.atestados + a.attendance.faltas + a.attendance.declaracoes
-                                                }))
-                                                .sort((a,b) => b.totalAbsences - a.totalAbsences)
-                                                .filter(a => a.totalAbsences > 0)
-                                                .slice(0, 15)
-                                            } 
-                                            margin={{top: 10, right: 10, left: 0, bottom: 20}}
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
-                                            <XAxis dataKey="name" tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} interval={0} angle={-30} textAnchor="end" height={60} />
-                                            <YAxis tick={{fontSize: 11, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                            <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9'}} cursor={{fill: '#1e293b'}} />
-                                            <Bar dataKey="totalAbsences" fill={COLORS.red} radius={[4, 4, 0, 0]} name="Total Ocorrências" barSize={30} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                                    ))}
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Tab Content: Issues */}
-                {activeTab === 'issues' && (
-                    <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden animate-in fade-in duration-500">
-                        <div className="px-6 py-5 border-b border-red-900/30 bg-red-900/10 flex justify-between items-center">
-                            <h3 className="font-bold text-red-400 flex items-center gap-2">
-                                <AlertTriangle size={20} />
-                                Ocorrências e Pendências
-                            </h3>
-                            <span className="bg-slate-900 text-red-400 px-3 py-1 rounded-full text-xs font-bold border border-red-900/50">{pendenciasList.length} Registros</span>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left text-slate-400">
-                                <thead className="text-xs text-slate-500 uppercase bg-slate-800/50 border-b border-slate-700">
-                                    <tr>
-                                        <th className="px-6 py-4 font-semibold">Data</th>
-                                        <th className="px-6 py-4 font-semibold">Agente</th>
-                                        <th className="px-6 py-4 font-semibold">Supervisor</th>
-                                        <th className="px-6 py-4 font-semibold">Tipo</th>
-                                        <th className="px-6 py-4 font-semibold">Observação</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800/50">
-                                    {pendenciasList.map((row, index) => (
-                                        <tr key={index} className="hover:bg-slate-800/50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-300">{row.DataISO.split('-').reverse().join('/')}</td>
-                                            <td className="px-6 py-4 font-medium text-slate-200">{row.Agente}</td>
-                                            <td className="px-6 py-4">{row.Supervisor}</td>
-                                            <td className="px-6 py-4"><span className="bg-red-900/30 text-red-400 border border-red-900/50 px-2.5 py-1 rounded-md text-xs font-bold inline-block">{row.Pendencias}</span></td>
-                                            <td className="px-6 py-4 italic text-slate-500 whitespace-normal break-words min-w-[300px]" title={row.Observacao}>"{row.Observacao}"</td>
-                                        </tr>
-                                    ))}
-                                    {pendenciasList.length === 0 && (
-                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500">Nenhuma pendência encontrada.</td></tr>
+
+                    {/* --- TAB VIEW 5: MORE / MANAGEMENT --- */}
+                    {activeTab === 'more' && (
+                        <div className="space-y-6 animate-in fade-in duration-300">
+                            {/* Inner Screen navigation switcher (tab panel slider) */}
+                            <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-800 shrink-0">
+                                <button 
+                                    onClick={() => setInnerManagementTab('hr')}
+                                    className={`w-1/2 text-center py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                                        innerManagementTab === 'hr' 
+                                        ? 'bg-indigo-600 text-white shadow-md' 
+                                        : 'text-slate-400 hover:text-slate-200'
+                                    }`}
+                                >
+                                    <Activity size={14} />
+                                    Recursos Humanos
+                                </button>
+                                <button 
+                                    onClick={() => setInnerManagementTab('issues')}
+                                    className={`w-1/2 text-center py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 relative ${
+                                        innerManagementTab === 'issues' 
+                                        ? 'bg-indigo-600 text-white shadow-md' 
+                                        : 'text-slate-400 hover:text-slate-200'
+                                    }`}
+                                >
+                                    <AlertTriangle size={14} />
+                                    Pendências
+                                    {pendenciasList.length > 0 && (
+                                        <span className="absolute top-1 right-2.5 h-2 w-2 rounded-full bg-rose-500 border border-slate-950"></span>
                                     )}
-                                </tbody>
-                            </table>
+                                </button>
+                            </div>
+
+                            {/* INNER SCREEN SUB CONTENT */}
+                            {innerManagementTab === 'hr' ? (
+                                <div className="space-y-5 animate-in fade-in duration-200">
+                                    {/* Attendance mini-cards */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Atestados Médicos</span>
+                                            <h4 className="text-base font-bold text-blue-400 mt-1">{analytics.attendance.atestados}</h4>
+                                        </div>
+                                        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Faltas Injustificadas</span>
+                                            <h4 className="text-base font-bold text-red-400 mt-1">{analytics.attendance.faltas}</h4>
+                                        </div>
+                                        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Consultas Med.</span>
+                                            <h4 className="text-base font-bold text-purple-400 mt-1">{analytics.attendance.consultas}</h4>
+                                        </div>
+                                        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Declarações</span>
+                                            <h4 className="text-base font-bold text-teal-400 mt-1">{analytics.attendance.declaracoes}</h4>
+                                        </div>
+                                    </div>
+
+                                    {/* Absences Distribution Pie Chart */}
+                                    {hrChartData.length > 0 ? (
+                                        <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shrink-0">
+                                            <h4 className="text-xs font-bold text-slate-200 mb-4 text-center">Tipos de Justificativa</h4>
+                                            <div className="w-full h-44 flex items-center justify-center relative">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie data={hrChartData} cx="50%" cy="50%" innerRadius={42} outerRadius={68} paddingAngle={4} dataKey="value" stroke="none">
+                                                            {hrChartData.map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                            ))}
+                                                        </Pie>
+                                                        <Tooltip />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                                {/* Legend in line */}
+                                            </div>
+                                            <div className="flex flex-wrap gap-2.5 justify-center text-[10px] text-slate-400 border-t border-slate-800/50 pt-2.5">
+                                                {hrChartData.map((lbl, idx) => (
+                                                    <span key={idx} className="flex items-center gap-1">
+                                                        <span className="w-2 h-2 rounded-full inline-block" style={{backgroundColor: lbl.fill}}></span>
+                                                        {lbl.name}: {lbl.value}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center p-6 bg-slate-900/40 border border-slate-800 rounded-xl font-medium text-slate-500 text-xs">Sem ocorrências de absenteísmo registradas.</div>
+                                    )}
+
+                                    {/* Absences List table conversion on Mobile */}
+                                    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                                        <div className="p-3.5 border-b border-slate-800 bg-slate-850/20">
+                                            <h4 className="text-xs font-bold text-slate-200">Incidentes por Agente</h4>
+                                        </div>
+                                        <div className="p-1 divide-y divide-slate-800/60 max-h-56 overflow-y-auto custom-scrollbar">
+                                            {analytics.rankingAgentes
+                                                .filter(a => (a.attendance.atestados + a.attendance.faltas + a.attendance.declaracoes + a.attendance.consultas + a.attendance.compensacoes) > 0)
+                                                .map((agent, index) => {
+                                                    const tot = agent.attendance.atestados + agent.attendance.faltas + agent.attendance.declaracoes + agent.attendance.consultas + agent.attendance.compensacoes;
+                                                    return (
+                                                        <div key={index} className="flex justify-between items-center p-2.5 text-xs text-slate-300">
+                                                            <span className="font-semibold text-slate-200 truncate pr-4 max-w-[150px]">{agent.name}</span>
+                                                            <div className="flex items-center gap-1 font-mono shrink-0">
+                                                                {agent.attendance.atestados > 0 && <span className="bg-blue-500/10 border border-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-[9px] font-bold">A: {agent.attendance.atestados}</span>}
+                                                                {agent.attendance.faltas > 0 && <span className="bg-red-500/10 border border-red-500/20 text-red-500 px-1.5 py-0.5 rounded text-[9px] font-bold">F: {agent.attendance.faltas}</span>}
+                                                                {tot > (agent.attendance.atestados + agent.attendance.faltas) && (
+                                                                     <span className="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[9px]">Outros: {tot - (agent.attendance.atestados + agent.attendance.faltas)}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3.5 animate-in fade-in duration-200">
+                                    {/* Pendências Timeline layout */}
+                                    <div className="flex justify-between items-center text-xs text-slate-400 font-bold px-1">
+                                        <span>Alertas Críticos</span>
+                                        <span className="bg-red-950 text-red-400 border border-red-900/50 px-2 py-0.5 rounded-full text-[10px]">{pendenciasList.length} registros</span>
+                                    </div>
+
+                                    <div className="space-y-3 max-h-[460px] overflow-y-auto custom-scrollbar">
+                                        {pendenciasList.map((row, index) => (
+                                            <div 
+                                                key={index} 
+                                                className="bg-slate-900 border border-red-900/20 hover:border-red-900/40 p-4 rounded-xl space-y-2 border-l-4 border-l-red-500 shadow-sm"
+                                            >
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono font-bold shrink-0">
+                                                        {row.DataISO.split('-').reverse().join('/')}
+                                                    </span>
+                                                    <span className="bg-red-500/10 text-red-400 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-red-500/20 shrink truncate">
+                                                        {row.Pendencias}
+                                                    </span>
+                                                </div>
+
+                                                <div className="space-y-0.5">
+                                                    <h4 className="text-xs font-bold text-slate-200">{row.Agente}</h4>
+                                                    <p className="text-[10px] text-slate-500 font-semibold">Supervisor: {row.Supervisor}</p>
+                                                </div>
+
+                                                {row.Observacao && (
+                                                    <p className="text-[11px] text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/80 italic font-medium">
+                                                        "{row.Observacao}"
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {pendenciasList.length === 0 && (
+                                            <div className="text-center p-8 bg-slate-900/40 border border-slate-850 rounded-xl font-medium text-slate-500 text-xs text-center">Nenhuma pendência crítica ou atraso observado.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    )}
+
+                </div>
+
+                {/* Simulated Fixed Native iOS/Android Bottom Navigation Bar */}
+                <footer className="absolute bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-1.5 flex justify-around items-center z-20">
+                    {[
+                        { id: 'overview', label: 'Resumo', icon: BarChart2 },
+                        { id: 'quality', label: 'Saúde', icon: Droplet },
+                        { id: 'neighborhoods', label: 'Locais', icon: MapPin },
+                        { id: 'teams', label: 'Equipes', icon: Users },
+                        { id: 'more', label: 'Gestão', icon: ClipboardList, count: pendenciasList.length }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition-all relative ${
+                                activeTab === tab.id 
+                                ? 'text-indigo-400' 
+                                : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            <tab.icon size={18} className={`transition-transform duration-200 ${activeTab === tab.id ? 'scale-110 drop-shadow-md' : 'scale-100'}`} />
+                            <span className="text-[9px] font-bold mt-1 tracking-tight leading-none">{tab.label}</span>
+                            
+                            {/* Pulse dot badge on "Gestão" if list has notices */}
+                            {tab.count !== undefined && tab.count > 0 && (
+                                <span className="absolute top-1.5 right-4 h-2 w-2 rounded-full bg-rose-500 border border-slate-900 animate-pulse"></span>
+                            )}
+                        </button>
+                    ))}
+                </footer>
+            </div>
+        );
+    };
+
+    // --- MAIN RENDER LOGIC WITH CONDITIONAL WORKSPACE SIMULATOR ---
+    return (
+        <div className="min-h-screen bg-slate-950 font-sans text-slate-100 select-none antialiased">
+            
+            {/* Conditional Desktop Layout with immersive presentation simulator */}
+            {!isMobileDevice && viewMode === 'simulator' ? (
+                // 💻 DESKTOP SMARTPHONE SIMULATOR VIEW (With gorgeous blurred background glassmorphism dashboard)
+                <div className="min-h-screen w-full relative flex flex-col items-center justify-center p-4 overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
+                    {/* Abstract blurred organic forms behind the phone */}
+                    <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-indigo-600/10 rounded-full filter blur-3xl animate-pulse"></div>
+                    <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-emerald-600/5 rounded-full filter blur-3xl animate-pulse delay-500"></div>
+                    
+                    {/* Top control banner wrapper */}
+                    <div className="mb-4 bg-slate-900/80 backdrop-blur-md border border-slate-800/80 px-4 py-2 text-xs font-semibold rounded-full flex items-center gap-6 z-10 shadow-lg text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                            <Smartphone size={14} className="text-indigo-400" />
+                            <span>Celular Simulado (iPhone / Android)</span>
+                        </div>
+                        <div className="h-4 w-px bg-slate-800"></div>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => setViewMode('simulator')}
+                                className={`px-2 py-0.5 rounded flex items-center gap-1 ${viewMode === 'simulator' ? 'bg-indigo-600 text-white font-bold' : 'hover:text-white'}`}
+                            >
+                                <Smartphone size={10} /> Simulator
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('full')}
+                                className={`px-2 py-0.5 rounded flex items-center gap-1 ${viewMode === 'full' ? 'bg-indigo-600 text-white font-bold' : 'hover:text-white'}`}
+                            >
+                                <Monitor size={10} /> Fullscreen Mobile
+                            </button>
                         </div>
                     </div>
-                )}
-            </main>
 
+                    {/* PHYSICAL BEZEL-LESS CELL PHONE SHELL FRAME (Fully functional interface) */}
+                    <div className="relative w-[380px] h-[780px] bg-slate-900 border-[10px] border-slate-800/90 rounded-[50px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden ring-4 ring-slate-800/40 ring-offset-4 ring-offset-slate-950 z-10 transition-transform duration-300">
+                        
+                        {/* Interactive dynamic screen notch at the top */}
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-950 rounded-full flex items-center justify-around px-2 z-30 ring-1 ring-slate-800/20">
+                            {/* Lens Dot */}
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-900 ring-2 ring-slate-800"></span>
+                            {/* Speaker lines */}
+                            <span className="w-8 h-1 bg-slate-900 rounded-full"></span>
+                        </div>
+
+                        {/* Interactive simulated locks / physical volume button notches outside the screen */}
+                        <div className="absolute top-24 -left-[14px] w-[4px] h-12 bg-slate-700 rounded-r-md"></div>
+                        <div className="absolute top-40 -left-[14px] w-[4px] h-12 bg-slate-700 rounded-r-md"></div>
+                        <div className="absolute top-32 -right-[14px] w-[4px] h-14 bg-slate-700 rounded-l-md"></div>
+
+                        {/* HIGH-FIDELITY MOBILE STATUS BAR */}
+                        <div className="bg-slate-950 font-sans tracking-wide text-[11px] text-slate-300 font-bold h-9 pt-2.5 px-6 flex items-center justify-between shrink-0 select-none z-20">
+                            {/* Clock simulated */}
+                            <div className="text-slate-100 font-medium text-[10px]">{clockString}</div>
+                            {/* Cellular battery/wifi icons */}
+                            <div className="flex items-center gap-1.5 text-slate-300">
+                                {/* Carrier bar icons */}
+                                <div className="flex items-end gap-0.5 h-2 w-3.5">
+                                    <span className="w-0.5 h-1 bg-indigo-400 rounded-full"></span>
+                                    <span className="w-0.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                                    <span className="w-0.5 h-2 bg-indigo-400 rounded-full"></span>
+                                    <span className="w-0.5 h-[9px] bg-indigo-400 rounded-full"></span>
+                                </div>
+                                <span className="text-[10px] tracking-tight">5G</span>
+                                {/* Wi-Fi */}
+                                <div className="flex h-2.5 w-3 items-center justify-center relative">
+                                    <span className="absolute border font-black text-[7px] text-indigo-400">⚡</span>
+                                </div>
+                                {/* Battery container */}
+                                <div className="w-5 h-2.5 border border-slate-500 rounded p-[1px] flex items-center shrink-0">
+                                    <div className="bg-emerald-500 h-full w-[85%] rounded"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Interactive app interface inside */}
+                        {renderMobileAppContent()}
+
+                        {/* Home indicator bar (slide bar simulated) */}
+                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-700/60 rounded-full z-30 pointer-events-none"></div>
+                    </div>
+                </div>
+            ) : (
+                // 📱 MOBILE EMBEDDING / FULL IMMERSIVE VIEWPORT (Automatically activates on real phone screens)
+                <div className="min-h-screen w-full flex flex-col overflow-hidden bg-slate-950 text-slate-100 selection:bg-indigo-600">
+                    {/* Simulated sticky top band on desktop full-screen to allow reverting */}
+                    {!isMobileDevice && (
+                        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 text-xs font-semibold flex items-center justify-between shadow-md text-slate-400 shrink-0">
+                            <span className="flex items-center gap-1.5"><Smartphone size={14} className="text-indigo-400" /> Modo Imersivo Móvel</span>
+                            <button 
+                                onClick={() => setViewMode('simulator')}
+                                className="bg-indigo-600 font-bold text-white text-[10px] uppercase tracking-wide px-3 py-1 rounded hover:bg-indigo-500"
+                            >
+                                Ativar Simulador Celular
+                            </button>
+                        </div>
+                    )}
+                    
+                    {/* Complete app element */}
+                    {renderMobileAppContent()}
+                </div>
+            )}
+
+
+            {/* --- GOAL CONFIG SHEET MODAL --- */}
             <GoalModal isOpen={showGoalModal} onClose={() => setShowGoalModal(false)} goals={goals} setGoals={setGoals} />
             
-            {/* Detailed Agent Modal */}
+            {/* --- AGENT DETAILS SHEET PANEL (DYNAMIC OVERLAY) --- */}
             <AgentDetailsModal 
                 isOpen={!!selectedAgent} 
                 onClose={() => setSelectedAgent(null)} 
                 agentName={selectedAgent || ''} 
                 data={selectedAgentData}
             />
+
+
+            {/* --- FLOATING BOTTOM FILTER SHEET --- */}
+            {isFilterSheetOpen && (
+                <>
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/75 backdrop-blur-xs z-40 transition-opacity animate-in fade-in duration-200"
+                        onClick={() => setIsFilterSheetOpen(false)}
+                    />
+                    
+                    {/* Glass Bottom Sheet container */}
+                    <div className="fixed inset-x-0 bottom-0 max-h-[85vh] bg-slate-900 border-t border-slate-800 rounded-t-[30px] shadow-2xl z-50 flex flex-col transition-transform duration-300 animate-in slide-in-from-bottom duration-300">
+                        {/* Sheet puller handle decoration */}
+                        <div className="w-12 h-1.5 bg-slate-800 rounded-full mx-auto my-3 cursor-pointer" onClick={() => setIsFilterSheetOpen(false)}></div>
+                        
+                        {/* Sheet Header */}
+                        <div className="px-6 pb-4 border-b border-slate-800/80 flex justify-between items-center bg-slate-900/40">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                                    <SlidersHorizontal size={16} className="text-indigo-400" />
+                                    Filtros Móveis
+                                </h3>
+                                <p className="text-[11px] text-slate-400">Refine os relatórios e cobertura de metas</p>
+                            </div>
+                            <button 
+                                onClick={handleResetFilters}
+                                className="text-xs text-indigo-400 font-bold hover:text-indigo-300 active:underline"
+                            >
+                                Redefinir
+                            </button>
+                        </div>
+
+                        {/* Sheet selectors - scrollable vertically */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+                            {/* Year selectivity */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Ano de Atuação</label>
+                                <select 
+                                    className="w-full bg-slate-955 border border-slate-800 text-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer bg-slate-950 font-medium text-xs"
+                                    value={localFilters.ano}
+                                    onChange={(e) => setLocalFilters({...localFilters, ano: e.target.value})}
+                                >
+                                    <option value="Todos">Todos os Anos</option>
+                                    {options.anos?.map((opt: string) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Supervisor selects */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Supervisor</label>
+                                <select 
+                                    className="w-full bg-slate-955 border border-slate-800 text-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer bg-slate-950 font-medium text-xs"
+                                    value={localFilters.supervisor}
+                                    onChange={(e) => setLocalFilters({...localFilters, supervisor: e.target.value})}
+                                >
+                                    <option value="Todos">Todos os Supervisores</option>
+                                    {options.supervisores?.map((opt: string) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Agente dropdown */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Agente de Campo</label>
+                                <select 
+                                    className="w-full bg-slate-955 border border-slate-800 text-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer bg-slate-950 font-medium text-xs"
+                                    value={localFilters.agente}
+                                    onChange={(e) => setLocalFilters({...localFilters, agente: e.target.value})}
+                                >
+                                    <option value="Todos">Todos os Agentes</option>
+                                    {options.agentes?.map((opt: string) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Ciclo selectors */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Ciclo do Programa</label>
+                                <select 
+                                    className="w-full bg-slate-955 border border-slate-800 text-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer bg-slate-950 font-medium text-xs"
+                                    value={localFilters.ciclo}
+                                    onChange={(e) => setLocalFilters({...localFilters, ciclo: e.target.value})}
+                                >
+                                    <option value="Todos">Todos os Ciclos</option>
+                                    {options.ciclos?.map((opt: string) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Mês Selector */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Mês de Referência</label>
+                                <select 
+                                    className="w-full bg-slate-955 border border-slate-800 text-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all cursor-pointer bg-slate-950 font-medium text-xs"
+                                    value={localFilters.mes}
+                                    onChange={(e) => setLocalFilters({...localFilters, mes: e.target.value})}
+                                >
+                                    <option value="Todos">Todos os Meses</option>
+                                    {options.meses?.map((opt: string) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Sticky Action Footer */}
+                        <div className="bg-slate-900 border-t border-slate-800 px-6 py-4 flex gap-3 pb-8 shrink-0">
+                            <button 
+                                onClick={() => setIsFilterSheetOpen(false)}
+                                className="w-2/5 border border-slate-850 hover:bg-slate-800 text-slate-300 font-bold py-3.5 rounded-2xl text-xs transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleApplyFilters}
+                                className="w-3/5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl text-xs shadow-lg shadow-indigo-950/40 transition-all active:scale-[0.98]"
+                            >
+                                Aplicar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* --- PWA INSTALLATION GUIDE MODAL --- */}
+            {showPwaGuide && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 animate-in fade-in duration-200 p-0 sm:p-4">
+                    {/* Click outside backdrop */}
+                    <div className="absolute inset-0 cursor-pointer" onClick={() => setShowPwaGuide(false)}></div>
+                    
+                    <div className="relative bg-slate-900 border-t sm:border border-slate-800 rounded-t-[30px] sm:rounded-2xl p-6 w-full max-w-md shadow-2xl transition-all animate-in slide-in-from-bottom duration-300 pb-10 sm:pb-6 z-10 flex flex-col max-h-[90vh]">
+                        {/* Pull handle decoration for mobile view */}
+                        <div className="w-12 h-1 bg-slate-800 rounded-full mx-auto mb-5 sm:hidden" onClick={() => setShowPwaGuide(false)}></div>
+
+                        <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                                    <Smartphone className="text-indigo-400" size={18} />
+                                    Instalar no Celular
+                                </h3>
+                                <p className="text-[10px] text-slate-500 mt-0.5">Substituto moderno do arquivo APK tradicional</p>
+                            </div>
+                            <button 
+                                onClick={() => setShowPwaGuide(false)} 
+                                className="p-1.5 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4 text-xs overflow-y-auto custom-scrollbar pr-1 flex-1 py-1">
+                            {/* Explanation Card */}
+                            <div className="bg-slate-950/60 border border-slate-800 p-3.5 rounded-xl space-y-1.5">
+                                <h4 className="font-bold text-indigo-400 text-xs flex items-center gap-1.5">
+                                    <Sparkles size={13} /> Por que usar o App PWA?
+                                </h4>
+                                <p className="text-slate-400 leading-relaxed text-[11px]">
+                                    Este painel foi desenvolvido com a tecnologia <strong>PWA (Progressive Web App)</strong>. Ela é 100% segura, homologada por Google e Apple, e elimina a necessidade de instalar arquivos <code>.apk</code> externos que podem conter vírus ou exigir permissões perigosas.
+                                </p>
+                                <ul className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 font-semibold pt-1">
+                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Sem downloads complexos</li>
+                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Atualizações instantâneas</li>
+                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Sem barras do navegador</li>
+                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Funciona off-line em caches</li>
+                                </ul>
+                            </div>
+
+                            {/* Mobile Instructions */}
+                            <div className="space-y-3 pt-1">
+                                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/20">
+                                    <div className="bg-slate-800/20 px-3.5 py-2 border-b border-slate-800 flex items-center gap-2">
+                                        <div className="w-5 h-5 rounded-md bg-blue-600/10 text-blue-400 border border-blue-500/10 flex items-center justify-center text-[10px] font-black">A</div>
+                                        <span className="font-bold text-slate-200">Como Instalar no Android (Chrome)</span>
+                                    </div>
+                                    <div className="p-3.5 space-y-2.5 text-[11px] text-slate-350">
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">1.</span>
+                                            <p>Abra o link do painel no navegador do celular (<strong>Google Chrome</strong>).</p>
+                                        </div>
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">2.</span>
+                                            <p>Clique no menu de <strong>três pontinhos</strong> (canto superior direito do navegador).</p>
+                                        </div>
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">3.</span>
+                                            <p>Selecione a opção <strong className="text-blue-400">"Instalar aplicativo"</strong> ou <strong className="text-blue-400">"Adicionar à tela de início"</strong>.</p>
+                                        </div>
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">4.</span>
+                                            <p>Pronto! O aplicativo aparecerá na sua tela inicial com ícone próprio e abrirá sem barras.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/20">
+                                    <div className="bg-slate-800/20 px-3.5 py-2 border-b border-slate-800 flex items-center gap-2">
+                                        <div className="w-5 h-5 rounded-md bg-orange-600/10 text-orange-400 border border-orange-500/10 flex items-center justify-center text-[10px] font-black">B</div>
+                                        <span className="font-bold text-slate-200">Como Instalar no iPhone (Safari)</span>
+                                    </div>
+                                    <div className="p-3.5 space-y-2.5 text-[11px] text-slate-350">
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">1.</span>
+                                            <p>Abra o link do painel utilizando o navegador nativo (<strong>Safari</strong>).</p>
+                                        </div>
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">2.</span>
+                                            <p>Clique no botão de <strong className="text-orange-400">Compartilhar</strong> (ícone de quadrado com seta para cima na barra inferior).</p>
+                                        </div>
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">3.</span>
+                                            <p>Role um pouco para baixo e escolha a opção <strong className="text-orange-400">"Adicionar à Tela de Início"</strong>.</p>
+                                        </div>
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="font-bold text-slate-400 mt-0.5">4.</span>
+                                            <p>Selecione <strong>"Adicionar"</strong> no canto direito superior. Ícone instalado com sucesso!</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex gap-3">
+                            <button 
+                                onClick={() => setShowPwaGuide(false)} 
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all active:scale-[0.98] text-xs text-center shadow-lg shadow-indigo-950/40"
+                            >
+                                Entendi, Vou Instalar!
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

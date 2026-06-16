@@ -1,5 +1,8 @@
 {
   "name": "Copy of ProdAnalise",
   "description": "Analise de dados",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

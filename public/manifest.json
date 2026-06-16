@@ -1,0 +1,19 @@
+{
+  "short_name": "ProdAnalytics",
+  "name": "ProdAnalytics - Gestão e Produtividade de Campo",
+  "description": "Aplicativo de análise epidemiológica, monitoramento de produtividade e controle de vetores.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3067/3067260.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["utilities", "productivity"]
+}
