@@ -6,15 +6,14 @@ import {
 import { 
   UploadCloud, BarChart2, Target, Briefcase, Droplet, 
   TrendingUp, Home, Users, AlertTriangle, ClipboardList, PieChart as PieIcon, MapPin, FileText,
-  Stethoscope, FileCheck, Clock, UserX, Activity, SlidersHorizontal, ArrowLeft, ChevronRight, CheckCircle, Info, Database, Sparkles, Smartphone, Monitor, ChevronUp, ChevronDown, X
+  Stethoscope, FileCheck, Clock, UserX, Activity, SlidersHorizontal, ArrowLeft, ChevronRight, CheckCircle, Info, Database, Sparkles, Smartphone, Monitor, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { ProductionData, FilterState, GoalSettings } from '../types';
-import { processDataFile, calculateAnalytics, COLORS } from '../utils';
+import { processDataFile, calculateAnalytics, COLORS, processGoogleSheetsRows, fetchPublicGoogleSheet } from '../utils';
 import { KpiCard } from './KpiCard';
 import { GoalModal } from './GoalModal';
 import { generatePDFReport } from './ReportGenerator';
 import { AgentDetailsModal } from './AgentDetailsModal';
-
 // --- Custom Tooltip Components for Mobile ---
 
 const CustomBarTooltip = ({ active, payload, label }: any) => {
@@ -198,6 +197,39 @@ export const Dashboard: React.FC = () => {
     const [rawData, setRawData] = useState<ProductionData[]>([]);
     const [loading, setLoading] = useState(false);
     
+    // Google Sheets public integration states
+    const [isFetchingSheets, setIsFetchingSheets] = useState(false);
+    const [sheetsError, setSheetsError] = useState<string | null>(null);
+    const [spreadsheetId, setSpreadsheetId] = useState("1irlAWm0LeKcG6RJpAb0bzlW2KzoEU1Ke9c4tDf_x_F4");
+    const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+    const loadPublicSpreadsheet = async (id: string) => {
+        setSheetsError(null);
+        setIsFetchingSheets(true);
+        try {
+            const processed = await fetchPublicGoogleSheet(id);
+            if (processed.length === 0) {
+                throw new Error("Nenhum dado de produção válido encontrado ou processado na planilha.");
+            }
+            setRawData(processed);
+            
+            // Set last sync timestamp
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setLastSyncTime(timeStr);
+        } catch (err: any) {
+            console.error("Public spreadsheet load error:", err);
+            setSheetsError(err.message || "Erro ao carregar dados da planilha. Certifique-se de que a planilha está compartilhada como 'Qualquer pessoa com o link pode ler'.");
+        } finally {
+            setIsFetchingSheets(false);
+        }
+    };
+
+    // Load spreadsheet on mount and when spreadsheet ID changes
+    useEffect(() => {
+        loadPublicSpreadsheet(spreadsheetId);
+    }, [spreadsheetId]);
+    
     // Mobile navigation tabs: 'overview' (Visão Geral), 'quality' (Tratamento/Saúde), 'neighborhoods' (Bairros), 'teams' (Supervisores), 'more' (RH & Pendências)
     const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'neighborhoods' | 'teams' | 'more'>('overview');
     const [innerManagementTab, setInnerManagementTab] = useState<'hr' | 'issues'>('hr');
@@ -205,7 +237,6 @@ export const Dashboard: React.FC = () => {
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-    const [showPwaGuide, setShowPwaGuide] = useState(false);
     
     // User selected visual format mode (Simulator on right, or clean immersive full screen)
     const [viewMode, setViewMode] = useState<'simulator' | 'full'>('simulator');
@@ -440,37 +471,104 @@ export const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Import / Trigger Options */}
-                    <div className="space-y-4 pb-8 pt-8 max-w-sm mx-auto w-full">
-                        <label className="block w-full cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-4 px-6 rounded-2xl text-center shadow-lg shadow-indigo-950/50 transition-all transform active:scale-[0.98]">
-                            <span className="flex items-center justify-center gap-2 text-sm uppercase tracking-wider font-bold">
-                                <UploadCloud size={18} />
-                                Arquivo de Produção
-                            </span>
-                            <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
-                        </label>
+                    {/* Google Sheets Integration Section */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4 max-w-sm mx-auto w-full shadow-lg">
+                        <div className="flex items-center gap-2 text-indigo-400 pb-1 border-b border-slate-800/60">
+                            <Database size={18} className="text-emerald-400 animate-pulse" />
+                            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Planilha Google Sheets</h3>
+                        </div>
 
-                        <button 
-                            onClick={handleLoadDemoData}
-                            className="w-full flex items-center justify-center gap-2 border border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 text-slate-300 font-semibold py-3.5 px-6 rounded-2xl text-sm transition-all shadow-sm active:scale-[0.98]"
-                        >
-                            <Database size={16} className="text-indigo-400" />
-                            Explorar Dados de Teste
-                        </button>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+                                Link ou ID da Planilha do Google
+                            </label>
+                            <input 
+                                type="text"
+                                className="w-full bg-slate-950 border border-slate-850 rounded-xl p-2.5 text-slate-200 text-xs font-mono focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                                value={spreadsheetId}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    const idMatch = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                                    const newId = idMatch ? idMatch[1] : val.trim();
+                                    setSpreadsheetId(newId);
+                                }}
+                                placeholder="Insira o Link ou ID da Planilha"
+                            />
+                            <p className="text-[9px] text-slate-500 mt-1 leading-normal">
+                                Cole o link completo da planilha do Google Drive ou o ID. A planilha deve estar compartilhada como <strong>"Qualquer pessoa com o link"</strong>.
+                            </p>
+                        </div>
 
-                        <button 
-                            onClick={() => setShowPwaGuide(true)}
-                            className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-500/50 bg-indigo-950/20 hover:bg-indigo-950/50 text-indigo-300 font-bold py-3.5 px-6 rounded-2xl text-sm transition-all shadow-sm active:scale-[0.98] animate-pulse"
-                        >
-                            <Smartphone size={16} className="text-indigo-400" />
-                            Instalar no Celular (PWA)
-                        </button>
+                        <div className="space-y-2.5">
+                            {lastSyncTime && (
+                                <div className="bg-slate-950/80 border border-slate-850 p-2.5 rounded-xl flex items-center justify-between text-[10px]">
+                                    <span className="text-slate-400">Status:</span>
+                                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                        <CheckCircle size={12} />
+                                        Sincronizado ({lastSyncTime})
+                                    </span>
+                                </div>
+                            )}
 
-                        {loading && (
+                            <button 
+                                onClick={() => loadPublicSpreadsheet(spreadsheetId)}
+                                disabled={isFetchingSheets}
+                                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl text-xs shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+                            >
+                                {isFetchingSheets ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        <span>Buscando dados da planilha...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Database size={16} />
+                                        <span>Atualizar e Sincronizar Agora</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {sheetsError && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-3 text-[10px] text-left leading-relaxed flex gap-2">
+                                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold">Erro de Planilha:</p>
+                                    <p className="break-all">{sheetsError}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Secondary Fallback Trigger Options */}
+                    <div className="space-y-3 pb-8 pt-4 max-w-sm mx-auto w-full">
+                        <div className="relative flex py-2 items-center">
+                            <div className="flex-grow border-t border-slate-800"></div>
+                            <span className="flex-shrink mx-4 text-[10px] text-slate-500 font-bold uppercase tracking-wider">Ou</span>
+                            <div className="flex-grow border-t border-slate-800"></div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className="cursor-pointer border border-slate-800 hover:border-slate-700 bg-slate-900/20 hover:bg-slate-900/40 text-slate-300 font-semibold py-3 px-4 rounded-xl text-center shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs">
+                                <UploadCloud size={14} className="text-indigo-400" />
+                                <span>Arquivo Local</span>
+                                <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
+                            </label>
+
+                            <button 
+                                onClick={handleLoadDemoData}
+                                className="flex items-center justify-center gap-1.5 border border-slate-800 bg-slate-900/20 hover:bg-slate-900/40 text-slate-300 font-semibold py-3 px-4 rounded-xl text-xs transition-all shadow-sm active:scale-[0.98]"
+                            >
+                                <Database size={14} className="text-indigo-400" />
+                                <span>Dados de Teste</span>
+                            </button>
+                        </div>
+
+                        {(loading || isFetchingSheets) && (
                             <div className="flex justify-center pt-2">
-                                <div className="flex items-center gap-2.5 bg-slate-900 border border-slate-800 py-2 px-4 rounded-full">
-                                    <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                                    <span className="text-xs text-slate-400 font-medium">Carregando painel móvel...</span>
+                                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 py-1.5 px-3.5 rounded-full shadow">
+                                    <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-[10px] text-slate-400 font-medium">Processando e estruturando...</span>
                                 </div>
                             </div>
                         )}
@@ -498,6 +596,16 @@ export const Dashboard: React.FC = () => {
 
                     <div className="flex items-center gap-1.5">
                         <button 
+                            onClick={() => loadPublicSpreadsheet(spreadsheetId)}
+                            disabled={isFetchingSheets}
+                            className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-850 hover:bg-slate-800 text-slate-300 border-slate-750 disabled:opacity-50`}
+                            title="Sincronizar dados com o Google Sheets"
+                        >
+                            <Database size={14} className={isFetchingSheets ? "animate-spin text-emerald-400" : "text-emerald-400"} />
+                            <span className="hidden xs:inline text-[11px]">Sincronizar</span>
+                        </button>
+
+                        <button 
                             onClick={() => setIsFilterSheetOpen(true)}
                             className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
                                 activeFiltersCount > 0 
@@ -520,14 +628,6 @@ export const Dashboard: React.FC = () => {
                             title="Meta"
                         >
                             <Target size={14} />
-                        </button>
-                        
-                        <button 
-                            onClick={() => setShowPwaGuide(true)}
-                            className="p-2 bg-indigo-900/40 border border-indigo-700/50 rounded-lg text-indigo-400 hover:text-indigo-350 hover:bg-indigo-900/60"
-                            title="Instalar no Celular"
-                        >
-                            <Smartphone size={14} />
                         </button>
 
                         <button 
@@ -1335,115 +1435,6 @@ export const Dashboard: React.FC = () => {
                         </div>
                     </div>
                 </>
-            )}
-
-            {/* --- PWA INSTALLATION GUIDE MODAL --- */}
-            {showPwaGuide && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 animate-in fade-in duration-200 p-0 sm:p-4">
-                    {/* Click outside backdrop */}
-                    <div className="absolute inset-0 cursor-pointer" onClick={() => setShowPwaGuide(false)}></div>
-                    
-                    <div className="relative bg-slate-900 border-t sm:border border-slate-800 rounded-t-[30px] sm:rounded-2xl p-6 w-full max-w-md shadow-2xl transition-all animate-in slide-in-from-bottom duration-300 pb-10 sm:pb-6 z-10 flex flex-col max-h-[90vh]">
-                        {/* Pull handle decoration for mobile view */}
-                        <div className="w-12 h-1 bg-slate-800 rounded-full mx-auto mb-5 sm:hidden" onClick={() => setShowPwaGuide(false)}></div>
-
-                        <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-                            <div>
-                                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                                    <Smartphone className="text-indigo-400" size={18} />
-                                    Instalar no Celular
-                                </h3>
-                                <p className="text-[10px] text-slate-500 mt-0.5">Substituto moderno do arquivo APK tradicional</p>
-                            </div>
-                            <button 
-                                onClick={() => setShowPwaGuide(false)} 
-                                className="p-1.5 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-                        
-                        <div className="space-y-4 text-xs overflow-y-auto custom-scrollbar pr-1 flex-1 py-1">
-                            {/* Explanation Card */}
-                            <div className="bg-slate-950/60 border border-slate-800 p-3.5 rounded-xl space-y-1.5">
-                                <h4 className="font-bold text-indigo-400 text-xs flex items-center gap-1.5">
-                                    <Sparkles size={13} /> Por que usar o App PWA?
-                                </h4>
-                                <p className="text-slate-400 leading-relaxed text-[11px]">
-                                    Este painel foi desenvolvido com a tecnologia <strong>PWA (Progressive Web App)</strong>. Ela é 100% segura, homologada por Google e Apple, e elimina a necessidade de instalar arquivos <code>.apk</code> externos que podem conter vírus ou exigir permissões perigosas.
-                                </p>
-                                <ul className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 font-semibold pt-1">
-                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Sem downloads complexos</li>
-                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Atualizações instantâneas</li>
-                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Sem barras do navegador</li>
-                                    <li className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-400" /> Funciona off-line em caches</li>
-                                </ul>
-                            </div>
-
-                            {/* Mobile Instructions */}
-                            <div className="space-y-3 pt-1">
-                                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/20">
-                                    <div className="bg-slate-800/20 px-3.5 py-2 border-b border-slate-800 flex items-center gap-2">
-                                        <div className="w-5 h-5 rounded-md bg-blue-600/10 text-blue-400 border border-blue-500/10 flex items-center justify-center text-[10px] font-black">A</div>
-                                        <span className="font-bold text-slate-200">Como Instalar no Android (Chrome)</span>
-                                    </div>
-                                    <div className="p-3.5 space-y-2.5 text-[11px] text-slate-350">
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">1.</span>
-                                            <p>Abra o link do painel no navegador do celular (<strong>Google Chrome</strong>).</p>
-                                        </div>
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">2.</span>
-                                            <p>Clique no menu de <strong>três pontinhos</strong> (canto superior direito do navegador).</p>
-                                        </div>
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">3.</span>
-                                            <p>Selecione a opção <strong className="text-blue-400">"Instalar aplicativo"</strong> ou <strong className="text-blue-400">"Adicionar à tela de início"</strong>.</p>
-                                        </div>
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">4.</span>
-                                            <p>Pronto! O aplicativo aparecerá na sua tela inicial com ícone próprio e abrirá sem barras.</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/20">
-                                    <div className="bg-slate-800/20 px-3.5 py-2 border-b border-slate-800 flex items-center gap-2">
-                                        <div className="w-5 h-5 rounded-md bg-orange-600/10 text-orange-400 border border-orange-500/10 flex items-center justify-center text-[10px] font-black">B</div>
-                                        <span className="font-bold text-slate-200">Como Instalar no iPhone (Safari)</span>
-                                    </div>
-                                    <div className="p-3.5 space-y-2.5 text-[11px] text-slate-350">
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">1.</span>
-                                            <p>Abra o link do painel utilizando o navegador nativo (<strong>Safari</strong>).</p>
-                                        </div>
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">2.</span>
-                                            <p>Clique no botão de <strong className="text-orange-400">Compartilhar</strong> (ícone de quadrado com seta para cima na barra inferior).</p>
-                                        </div>
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">3.</span>
-                                            <p>Role um pouco para baixo e escolha a opção <strong className="text-orange-400">"Adicionar à Tela de Início"</strong>.</p>
-                                        </div>
-                                        <div className="flex items-start gap-2.5">
-                                            <span className="font-bold text-slate-400 mt-0.5">4.</span>
-                                            <p>Selecione <strong>"Adicionar"</strong> no canto direito superior. Ícone instalado com sucesso!</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-5 flex gap-3">
-                            <button 
-                                onClick={() => setShowPwaGuide(false)} 
-                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all active:scale-[0.98] text-xs text-center shadow-lg shadow-indigo-950/40"
-                            >
-                                Entendi, Vou Instalar!
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
 
         </div>

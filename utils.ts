@@ -71,6 +71,11 @@ export const NEIGHBORHOOD_TARGETS: Record<string, number> = {
     'Vila dos Técnicos': 242
 };
 
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5, jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11,
+  feb: 1, apr: 3, may: 4, aug: 7, sep: 8, oct: 9, dec: 11
+};
+
 export const parseExcelDate = (serial: number | string): { mes: string; dataFormatada: string } => {
   let mes = 'Indefinido';
   let dataFormatada = '';
@@ -81,30 +86,46 @@ export const parseExcelDate = (serial: number | string): { mes: string; dataForm
     mes = date.toLocaleString('pt-BR', { month: 'long' });
     dataFormatada = date.toISOString().split('T')[0];
   } else if (typeof serial === 'string') {
+    const trimmed = serial.trim();
     const ptDateRegex = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/;
-    const match = serial.match(ptDateRegex);
+    const matchPt = trimmed.match(ptDateRegex);
 
-    if (match) {
-        const day = parseInt(match[1], 10);
-        const month = parseInt(match[2], 10) - 1;
-        const year = parseInt(match[3], 10);
+    if (matchPt) {
+        const day = parseInt(matchPt[1], 10);
+        const month = parseInt(matchPt[2], 10) - 1;
+        const year = parseInt(matchPt[3], 10);
         const date = new Date(year, month, day);
         mes = date.toLocaleString('pt-BR', { month: 'long' });
         dataFormatada = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     } else {
-        try {
-            let dateStr = serial;
-            if (/^\d{4}-\d{2}-\d{2}$/.test(serial)) {
-                dateStr += 'T12:00:00';
-            }
-            
-            const date = new Date(dateStr);
-            if (!isNaN(date.getTime())) {
+        const mmmRegex = /^(\d{1,2})-(\w{3})-(\d{2,4})$/;
+        const matchMmm = trimmed.match(mmmRegex);
+        if (matchMmm) {
+            const day = parseInt(matchMmm[1], 10);
+            const mStr = matchMmm[2].toLowerCase();
+            const month = MONTH_MAP[mStr];
+            if (month !== undefined) {
+                let y = parseInt(matchMmm[3], 10);
+                const year = y < 100 ? 2000 + y : y;
+                const date = new Date(year, month, day);
                 mes = date.toLocaleString('pt-BR', { month: 'long' });
-                dataFormatada = date.toISOString().split('T')[0];
+                dataFormatada = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             }
-        } catch (e) {
-            console.warn("Date parse error", e);
+        } else {
+            try {
+                let dateStr = trimmed;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+                    dateStr += 'T12:00:00';
+                }
+                
+                const date = new Date(dateStr);
+                if (!isNaN(date.getTime())) {
+                    mes = date.toLocaleString('pt-BR', { month: 'long' });
+                    dataFormatada = date.toISOString().split('T')[0];
+                }
+            } catch (e) {
+                console.warn("Date parse error", e);
+            }
         }
     }
   }
@@ -160,6 +181,116 @@ export const processDataFile = (file: File): Promise<ProductionData[]> => {
     };
     reader.readAsBinaryString(file);
   });
+};
+
+const normalizeHeader = (h: string): string => {
+  if (!h) return '';
+  return h.normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "") // remove accents
+          .trim()
+          .toLowerCase();
+};
+
+const getHeaderIndices = (headerRow: string[]): Record<string, number> => {
+  const indices: Record<string, number> = {};
+  headerRow.forEach((header, index) => {
+    const norm = normalizeHeader(header);
+    if (norm === 'digitadores' || norm === 'digitador') indices['Digitadores'] = index;
+    else if (norm === 'supervisor') indices['Supervisor'] = index;
+    else if (norm === 'agente') indices['Agente'] = index;
+    else if (norm === 'ciclo') indices['Ciclo'] = index;
+    else if (norm === 'data') indices['Data'] = index;
+    else if (norm === 'bairro') indices['Bairro'] = index;
+    else if (norm === 'atividade') indices['Atividade'] = index;
+    else if (norm === 'total_t' || norm === 'total t' || norm === 'total') indices['Total_T'] = index;
+    else if (norm === 'fechado') indices['Fechado'] = index;
+    else if (norm === 'recusa') indices['Recusa'] = index;
+    else if (norm === 'resgate') indices['Resgate'] = index;
+    else if (norm === 'im_trat' || norm === 'im trat') indices['Im_Trat'] = index;
+    else if (norm === 'dep_elim' || norm === 'dep elim') indices['Dep_Elim'] = index;
+    else if (norm === 'larvicida') indices['Larvicida'] = index;
+    else if (norm === 'a1') indices['A1'] = index;
+    else if (norm === 'a2') indices['A2'] = index;
+    else if (norm === 'b') {
+      if (index > 4) {
+        indices['B'] = index;
+      }
+    }
+    else if (norm === 'c') indices['C'] = index;
+    else if (norm === 'd1') indices['D1'] = index;
+    else if (norm === 'd2') indices['D2'] = index;
+    else if (norm === 'e') indices['E'] = index;
+    else if (norm === 'r') indices['R'] = index;
+    else if (norm === 'comercio') indices['Comercio'] = index;
+    else if (norm === 'tb') indices['Tb'] = index;
+    else if (norm === 'pe') indices['PE'] = index;
+    else if (norm === 'o') indices['O'] = index;
+    else if (norm === 'pendencias') indices['Pendencias'] = index;
+    else if (norm === 'observacao' || norm === 'observacoes' || norm === 'observacao') indices['Observacao'] = index;
+  });
+  return indices;
+};
+
+export const processGoogleSheetsRows = (rows: any[][]): ProductionData[] => {
+  if (!rows || rows.length < 2) return [];
+
+  const headers = rows[0].map(h => String(h || ''));
+  const indices = getHeaderIndices(headers);
+
+  // Fallback map if indices are missing (column A is Digitadores, B is Supervisor, C is Agente, and so on)
+  const getIndex = (key: string, fallbackIdx: number): number => {
+    return indices[key] !== undefined ? indices[key] : fallbackIdx;
+  };
+
+  const dataRows = rows.slice(1);
+  return dataRows.map((row) => {
+    // Helper to get raw cell value by key or fallback index
+    const getVal = (key: string, fallbackIdx: number) => {
+      const idx = getIndex(key, fallbackIdx);
+      return row[idx] !== undefined ? row[idx] : '';
+    };
+
+    const rawDataField = getVal('Data', 4);
+    const { mes, dataFormatada } = parseExcelDate(rawDataField);
+    const n = (val: any) => {
+      if (typeof val === 'number') return val;
+      if (!val) return 0;
+      const parsed = parseFloat(String(val).replace(',', '.'));
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    return {
+      Supervisor: String(getVal('Supervisor', 1) || 'N/A').trim(),
+      Agente: String(getVal('Agente', 2) || 'N/A').trim(),
+      Ciclo: String(getVal('Ciclo', 3) || 'N/A').trim(),
+      Mes: mes,
+      Bairro: String(getVal('Bairro', 5) || 'N/A').trim(),
+      Atividade: String(getVal('Atividade', 6) || 'N/A').trim(),
+      DataISO: dataFormatada,
+      Data: rawDataField,
+      Total_T: n(getVal('Total_T', 7)),
+      Fechado: n(getVal('Fechado', 8)),
+      Recusa: n(getVal('Recusa', 9)),
+      Resgate: n(getVal('Resgate', 10)),
+      Im_Trat: n(getVal('Im_Trat', 11)),
+      Dep_Elim: n(getVal('Dep_Elim', 12)),
+      Larvicida: n(getVal('Larvicida', 13)),
+      A1: n(getVal('A1', 14)),
+      A2: n(getVal('A2', 15)),
+      B: n(getVal('B', 16)),
+      C: n(getVal('C', 17)),
+      D1: n(getVal('D1', 18)),
+      D2: n(getVal('D2', 19)),
+      E: n(getVal('E', 20)),
+      R: n(getVal('R', 21)),
+      Comercio: n(getVal('Comercio', 22)),
+      Tb: n(getVal('Tb', 23)),
+      PE: n(getVal('PE', 24)),
+      O: n(getVal('O', 25)),
+      Pendencias: String(getVal('Pendencias', 26) || 'Sem Pendência').trim(),
+      Observacao: String(getVal('Observacao', 27) || '').trim()
+    } as ProductionData;
+  }).filter(item => item.Agente && item.Agente !== 'N/A' && item.Supervisor && item.Supervisor !== 'N/A');
 };
 
 export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings): DashboardAnalytics => {
@@ -326,3 +457,69 @@ export const calculateAnalytics = (data: ProductionData[], goals: GoalSettings):
 
   return metrics;
 };
+
+export const parseCSV = (text: string): string[][] => {
+  // Simple delimiter auto-detection
+  const firstLine = text.split('\n')[0] || '';
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const semicolonCount = (firstLine.match(/;/g) || []).length;
+  const delimiter = semicolonCount > commaCount ? ';' : ',';
+
+  const lines: string[][] = [];
+  let row: string[] = [];
+  let col = "";
+  let insideQuote = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (insideQuote) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          col += '"';
+          i++;
+        } else {
+          insideQuote = false;
+        }
+      } else {
+        col += char;
+      }
+    } else {
+      if (char === '"') {
+        insideQuote = true;
+      } else if (char === delimiter) {
+        row.push(col);
+        col = "";
+      } else if (char === '\r' || char === '\n') {
+        row.push(col);
+        col = "";
+        lines.push(row);
+        row = [];
+        if (char === '\r' && nextChar === '\n') {
+          i++;
+        }
+      } else {
+        col += char;
+      }
+    }
+  }
+  if (col !== "" || row.length > 0) {
+    row.push(col);
+    lines.push(row);
+  }
+  // Filter out completely empty lines
+  return lines.filter(r => r.some(cell => cell.trim() !== ''));
+};
+
+export const fetchPublicGoogleSheet = async (spreadsheetId: string): Promise<ProductionData[]> => {
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Erro ao baixar a planilha: ${response.statusText}`);
+  }
+  const text = await response.text();
+  const rows = parseCSV(text);
+  return processGoogleSheetsRows(rows);
+};
+
