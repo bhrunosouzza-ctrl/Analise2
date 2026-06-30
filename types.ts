@@ -102,3 +102,23 @@ export interface GoalSettings {
     chartImoveis: { name: string; value: number }[];
     attendance: AttendanceMetrics; // Added global attendance metrics
   }
+  
+  export interface HoursBankEntry {
+    Nome: string;
+    Data: string;
+    DataISO: string;
+    Hora: number;
+    HoraFormatted: string;
+    Tipo: 'Horas Trab.' | 'Horas Compen.';
+    Descricao: string;
+  }
+
+  export interface HoursBankAgentSummary {
+    Nome: string;
+    Supervisor: string;
+    TotalTrabalhadas: number;
+    TotalCompensadas: number;
+    SaldoHoras: number;
+    Entries: HoursBankEntry[];
+  }
+

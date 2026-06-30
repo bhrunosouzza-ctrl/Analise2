@@ -8,12 +8,13 @@ import {
   TrendingUp, Home, Users, AlertTriangle, ClipboardList, PieChart as PieIcon, MapPin, FileText,
   Stethoscope, FileCheck, Clock, UserX, Activity, SlidersHorizontal, ArrowLeft, ChevronRight, CheckCircle, Info, Database, Sparkles, Smartphone, Monitor, ChevronUp, ChevronDown
 } from 'lucide-react';
-import { ProductionData, FilterState, GoalSettings } from '../types';
-import { processDataFile, calculateAnalytics, COLORS, processGoogleSheetsRows, fetchPublicGoogleSheet } from '../utils';
+import { ProductionData, FilterState, GoalSettings, HoursBankEntry } from '../types';
+import { processDataFile, calculateAnalytics, COLORS, processGoogleSheetsRows, fetchPublicGoogleSheet, fetchPublicGoogleSheetsAllData } from '../utils';
 import { KpiCard } from './KpiCard';
 import { GoalModal } from './GoalModal';
 import { generatePDFReport } from './ReportGenerator';
 import { AgentDetailsModal } from './AgentDetailsModal';
+import { HoursBankView } from './HoursBankView';
 // --- Custom Tooltip Components for Mobile ---
 
 const CustomBarTooltip = ({ active, payload, label }: any) => {
@@ -195,6 +196,7 @@ const generateDemoData = (): ProductionData[] => {
 
 export const Dashboard: React.FC = () => {
     const [rawData, setRawData] = useState<ProductionData[]>([]);
+    const [hoursBankData, setHoursBankData] = useState<HoursBankEntry[]>([]);
     const [loading, setLoading] = useState(false);
     
     // Google Sheets public integration states
@@ -207,11 +209,12 @@ export const Dashboard: React.FC = () => {
         setSheetsError(null);
         setIsFetchingSheets(true);
         try {
-            const processed = await fetchPublicGoogleSheet(id);
-            if (processed.length === 0) {
+            const { productionData, hoursBankData: hbData } = await fetchPublicGoogleSheetsAllData(id);
+            if (productionData.length === 0) {
                 throw new Error("Nenhum dado de produção válido encontrado ou processado na planilha.");
             }
-            setRawData(processed);
+            setRawData(productionData);
+            setHoursBankData(hbData);
             
             // Set last sync timestamp
             const now = new Date();
@@ -230,8 +233,8 @@ export const Dashboard: React.FC = () => {
         loadPublicSpreadsheet(spreadsheetId);
     }, [spreadsheetId]);
     
-    // Mobile navigation tabs: 'overview' (Visão Geral), 'quality' (Tratamento/Saúde), 'neighborhoods' (Bairros), 'teams' (Supervisores), 'more' (RH & Pendências)
-    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'neighborhoods' | 'teams' | 'more'>('overview');
+    // Mobile navigation tabs: 'overview' (Visão Geral), 'quality' (Tratamento/Saúde), 'neighborhoods' (Bairros), 'teams' (Supervisores), 'more' (RH & Pendências), 'hours' (Banco de Horas)
+    const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'neighborhoods' | 'teams' | 'more' | 'hours'>('overview');
     const [innerManagementTab, setInnerManagementTab] = useState<'hr' | 'issues'>('hr');
     
     const [showGoalModal, setShowGoalModal] = useState(false);
@@ -1158,6 +1161,11 @@ export const Dashboard: React.FC = () => {
                         </div>
                     )}
 
+                    {/* --- TAB VIEW 6: HOURS BANK --- */}
+                    {activeTab === 'hours' && (
+                        <HoursBankView hoursBankData={hoursBankData} productionData={rawData} />
+                    )}
+
                 </div>
 
                 {/* Simulated Fixed Native iOS/Android Bottom Navigation Bar */}
@@ -1167,6 +1175,7 @@ export const Dashboard: React.FC = () => {
                         { id: 'quality', label: 'Saúde', icon: Droplet },
                         { id: 'neighborhoods', label: 'Locais', icon: MapPin },
                         { id: 'teams', label: 'Equipes', icon: Users },
+                        { id: 'hours', label: 'B. Horas', icon: Clock },
                         { id: 'more', label: 'Gestão', icon: ClipboardList, count: pendenciasList.length }
                     ].map(tab => (
                         <button

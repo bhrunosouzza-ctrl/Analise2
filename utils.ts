@@ -1,5 +1,5 @@
 
-import { ProductionData, DashboardAnalytics, GoalSettings, NeighborhoodMetric, AttendanceMetrics } from './types';
+import { ProductionData, DashboardAnalytics, GoalSettings, NeighborhoodMetric, AttendanceMetrics, HoursBankEntry, HoursBankAgentSummary } from './types';
 import * as XLSX from 'xlsx';
 
 export const COLORS = {
@@ -87,13 +87,16 @@ export const parseExcelDate = (serial: number | string): { mes: string; dataForm
     dataFormatada = date.toISOString().split('T')[0];
   } else if (typeof serial === 'string') {
     const trimmed = serial.trim();
-    const ptDateRegex = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/;
+    const ptDateRegex = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/;
     const matchPt = trimmed.match(ptDateRegex);
 
     if (matchPt) {
         const day = parseInt(matchPt[1], 10);
         const month = parseInt(matchPt[2], 10) - 1;
-        const year = parseInt(matchPt[3], 10);
+        let year = parseInt(matchPt[3], 10);
+        if (year < 100) {
+            year += 2000;
+        }
         const date = new Date(year, month, day);
         mes = date.toLocaleString('pt-BR', { month: 'long' });
         dataFormatada = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -521,5 +524,131 @@ export const fetchPublicGoogleSheet = async (spreadsheetId: string): Promise<Pro
   const text = await response.text();
   const rows = parseCSV(text);
   return processGoogleSheetsRows(rows);
+};
+
+export interface FetchSheetsResult {
+  productionData: ProductionData[];
+  hoursBankData: HoursBankEntry[];
+}
+
+export const fetchPublicGoogleSheetsAllData = async (spreadsheetId: string): Promise<FetchSheetsResult> => {
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Erro ao baixar a planilha: ${response.statusText}`);
+  }
+  const buffer = await response.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  
+  // 1. Parse Sheet1 (Production Data)
+  let productionData: ProductionData[] = [];
+  const firstSheetName = workbook.SheetNames[0] || 'Sheet1';
+  const ws1 = workbook.Sheets['Sheet1'] || workbook.Sheets[firstSheetName];
+  if (ws1) {
+    const rows = XLSX.utils.sheet_to_json<any[]>(ws1, { header: 1 });
+    productionData = processGoogleSheetsRows(rows);
+  }
+
+  // 2. Parse Sheet2 (Hours Bank Data)
+  let hoursBankData: HoursBankEntry[] = [];
+  const secondSheetName = workbook.SheetNames.find(name => 
+    name.toLowerCase() === 'sheet2' || 
+    name.toLowerCase().includes('hora') || 
+    name.toLowerCase().includes('banco')
+  ) || workbook.SheetNames[1];
+  
+  if (secondSheetName) {
+    const ws2 = workbook.Sheets[secondSheetName];
+    const range = XLSX.utils.decode_range(ws2['!ref'] || '');
+    
+    const parseHoursValue = (rawVal: any, formattedVal: any): number => {
+      if (rawVal === undefined || rawVal === null) return 0;
+      if (typeof rawVal === 'number') {
+        const hasColon = formattedVal && String(formattedVal).includes(':');
+        if (hasColon) return rawVal * 24;
+        if (rawVal % 1 !== 0 && Math.abs(rawVal) < 3) return rawVal * 24;
+        return rawVal;
+      }
+      const str = String(formattedVal || rawVal).trim();
+      if (!str) return 0;
+      if (str.includes(':')) {
+        const parts = str.split(':');
+        const hours = parseFloat(parts[0]) || 0;
+        const minutes = parseFloat(parts[1]) || 0;
+        const seconds = parseFloat(parts[2]) || 0;
+        const sign = str.startsWith('-') || hours < 0 ? -1 : 1;
+        return sign * (Math.abs(hours) + minutes / 60 + seconds / 3600);
+      }
+      const num = parseFloat(str.replace(',', '.'));
+      return isNaN(num) ? 0 : num;
+    };
+
+    const formatHoursValue = (hoursNum: number): string => {
+      const sign = hoursNum < 0 ? '-' : '';
+      const absHours = Math.abs(hoursNum);
+      const wholeHours = Math.floor(absHours);
+      const minutes = Math.round((absHours - wholeHours) * 60);
+      if (minutes === 0) return `${sign}${wholeHours}`;
+      return `${sign}${wholeHours}:${String(minutes).padStart(2, '0')}`;
+    };
+
+    for (let r = range.s.r + 1; r <= range.e.r; r++) {
+      const cellNome = ws2[XLSX.utils.encode_cell({ r, c: 0 })];
+      const cellData = ws2[XLSX.utils.encode_cell({ r, c: 1 })];
+      const cellHora = ws2[XLSX.utils.encode_cell({ r, c: 2 })];
+      const cellTipo = ws2[XLSX.utils.encode_cell({ r, c: 3 })];
+      const cellDesc = ws2[XLSX.utils.encode_cell({ r, c: 4 })];
+      
+      const nome = cellNome ? String(cellNome.v || '').trim() : '';
+      if (nome && nome !== 'Nome') {
+        let dateFormatted = '';
+        let dateISO = '';
+        if (cellData) {
+          if (typeof cellData.v === 'number') {
+            const dateObj = new Date(Math.round((cellData.v - 25569) * 86400 * 1000) + 12 * 3600 * 1000);
+            const day = dateObj.getDate();
+            const month = dateObj.getMonth() + 1;
+            const year = dateObj.getFullYear();
+            dateFormatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+            dateISO = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          } else {
+            const rawDateStr = String(cellData.v || '').trim();
+            const { dataFormatada } = parseExcelDate(rawDateStr);
+            dateISO = dataFormatada;
+            if (dataFormatada) {
+              const [y, m, d] = dataFormatada.split('-');
+              dateFormatted = `${d}/${m}/${y}`;
+            } else {
+              dateFormatted = rawDateStr;
+            }
+          }
+        }
+        
+        const hoursParsed = cellHora ? parseHoursValue(cellHora.v, cellHora.w) : 0;
+        const horaFormatted = cellHora ? (cellHora.w || formatHoursValue(hoursParsed)) : '0';
+        const tipoStr = cellTipo ? String(cellTipo.v || '').trim() : '';
+        const tipoNormalized = (tipoStr.toLowerCase().includes('compen') || tipoStr.toLowerCase().includes('comp')) 
+          ? 'Horas Compen.' 
+          : 'Horas Trab.';
+          
+        const descricao = cellDesc ? String(cellDesc.v || '').trim() : '';
+        
+        hoursBankData.push({
+          Nome: nome,
+          Data: dateFormatted,
+          DataISO: dateISO,
+          Hora: hoursParsed,
+          HoraFormatted: horaFormatted,
+          Tipo: tipoNormalized as 'Horas Trab.' | 'Horas Compen.',
+          Descricao: descricao || '-'
+        });
+      }
+    }
+  }
+
+  return {
+    productionData,
+    hoursBankData
+  };
 };
 
