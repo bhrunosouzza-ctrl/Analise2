@@ -604,14 +604,38 @@ export const fetchPublicGoogleSheetsAllData = async (spreadsheetId: string): Pro
         let dateFormatted = '';
         let dateISO = '';
         if (cellData) {
-          if (typeof cellData.v === 'number') {
+          // 1. Try formatted text (cellData.w) first, which is the most reliable representation of what is shown in Excel
+          const formattedStr = cellData.w ? String(cellData.w).trim() : '';
+          const ptDateRegex = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/;
+          const matchPtFormatted = formattedStr.match(ptDateRegex);
+
+          if (matchPtFormatted) {
+            const day = parseInt(matchPtFormatted[1], 10);
+            const month = parseInt(matchPtFormatted[2], 10);
+            let year = parseInt(matchPtFormatted[3], 10);
+            if (year < 100) {
+              year += 2000;
+            }
+            dateFormatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+            dateISO = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          } else if (typeof cellData.v === 'number') {
+            // Excel serial number
             const dateObj = new Date(Math.round((cellData.v - 25569) * 86400 * 1000) + 12 * 3600 * 1000);
             const day = dateObj.getDate();
             const month = dateObj.getMonth() + 1;
             const year = dateObj.getFullYear();
             dateFormatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
             dateISO = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          } else if (cellData.v && (cellData.v instanceof Date || Object.prototype.toString.call(cellData.v) === '[object Date]')) {
+            // Date object
+            const dateObj = cellData.v;
+            const day = dateObj.getUTCDate();
+            const month = dateObj.getUTCMonth() + 1;
+            const year = dateObj.getUTCFullYear();
+            dateFormatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+            dateISO = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           } else {
+            // Fallback to raw string value
             const rawDateStr = String(cellData.v || '').trim();
             const { dataFormatada } = parseExcelDate(rawDateStr);
             dateISO = dataFormatada;
