@@ -242,7 +242,7 @@ export const Dashboard: React.FC = () => {
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
     
     // User selected visual format mode (Simulator on right, or clean immersive full screen)
-    const [viewMode, setViewMode] = useState<'simulator' | 'full'>('simulator');
+    const [viewMode, setViewMode] = useState<'simulator' | 'full'>('full');
     const [isMobileDevice, setIsMobileDevice] = useState(false);
 
     // Simulated Clock for status bar
@@ -582,66 +582,176 @@ export const Dashboard: React.FC = () => {
 
         // --- DASHBOARD CONTAINER SCREEN ---
         return (
-            <div className="flex-1 flex flex-col bg-slate-950 text-slate-100 overflow-hidden relative">
-                {/* Simulated In-App Top Bar */}
-                <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 shrink-0 flex items-center justify-between z-10">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg text-white shadow">
-                            <Activity size={18} />
+            <div className="flex-1 flex flex-col md:flex-row bg-slate-950 text-slate-100 overflow-hidden relative">
+                {/* 1. Desktop Left Sidebar - Visible on Desktop/Tablet only */}
+                <aside className="hidden md:flex md:w-64 bg-slate-900 border-r border-slate-800 flex-col justify-between shrink-0 select-none">
+                    <div className="flex flex-col flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+                        {/* Title Section */}
+                        <div className="flex items-center gap-2.5 pb-4 border-b border-slate-800">
+                            <div className="p-1.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl text-white shadow-md">
+                                <Activity size={20} />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-bold text-white tracking-tight">ProdAnalytics</h2>
+                                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Painel de Endemias</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-sm font-bold text-white tracking-tight leading-none">ProdAnalytics</h2>
-                            <p className="text-[10px] text-slate-400 font-medium mt-1 shrink truncate max-w-[120px]">
-                                {activeFiltersCount > 0 ? `${activeFiltersCount} Filtro(s) ativo(s)` : 'Todos os dados'}
-                            </p>
-                        </div>
-                    </div>
 
-                    <div className="flex items-center gap-1.5">
-                        <button 
-                            onClick={() => loadPublicSpreadsheet(spreadsheetId)}
-                            disabled={isFetchingSheets}
-                            className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-850 hover:bg-slate-800 text-slate-300 border-slate-750 disabled:opacity-50`}
-                            title="Sincronizar dados com o Google Sheets"
-                        >
-                            <Database size={14} className={isFetchingSheets ? "animate-spin text-emerald-400" : "text-emerald-400"} />
-                            <span className="hidden xs:inline text-[11px]">Sincronizar</span>
-                        </button>
+                        {/* Navigation Tab Menu */}
+                        <nav className="flex flex-col gap-1">
+                            {[
+                                { id: 'overview', label: 'Resumo Geral', icon: BarChart2 },
+                                { id: 'quality', label: 'Saúde e Tratamento', icon: Droplet },
+                                { id: 'neighborhoods', label: 'Bairros e Metas', icon: MapPin },
+                                { id: 'teams', label: 'Equipes', icon: Users },
+                                { id: 'hours', label: 'Banco de Horas', icon: Clock },
+                                { id: 'more', label: 'Gestão de Pendências', icon: ClipboardList, count: pendenciasList.length }
+                            ].map(tab => {
+                                const Icon = tab.icon;
+                                const isActive = activeTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={`w-full flex items-center justify-between py-2.5 px-3 rounded-xl transition-all ${
+                                            isActive
+                                            ? 'bg-indigo-600/15 text-indigo-400 border border-indigo-500/20 font-bold'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2.5">
+                                            <Icon size={16} />
+                                            <span className="text-xs">{tab.label}</span>
+                                        </div>
+                                        {tab.count !== undefined && tab.count > 0 && (
+                                            <span className="h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-bold">
+                                                {tab.count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </nav>
 
-                        <button 
-                            onClick={() => setIsFilterSheetOpen(true)}
-                            className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
-                                activeFiltersCount > 0 
-                                ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/40 shadow-sm' 
-                                : 'bg-slate-800 text-slate-300 border-slate-700/60'
-                            }`}
-                        >
-                            <SlidersHorizontal size={14} />
-                            Filtros
-                            {activeFiltersCount > 0 && (
-                                <span className="h-4 w-4 rounded-full bg-indigo-500 text-white text-[9px] flex items-center justify-center font-black">
-                                    {activeFiltersCount}
-                                </span>
+                        {/* Sync Info in Sidebar */}
+                        <div className="bg-slate-950/50 border border-slate-800/60 rounded-xl p-3 space-y-3">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                                <Database size={14} className="text-emerald-400" />
+                                <span>Google Sheets Sinc</span>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Planilha ID</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-[10px] font-mono text-slate-300 focus:outline-none"
+                                    value={spreadsheetId}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const idMatch = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                                        const newId = idMatch ? idMatch[1] : val.trim();
+                                        setSpreadsheetId(newId);
+                                    }}
+                                />
+                            </div>
+                            {lastSyncTime && (
+                                <p className="text-[9px] text-slate-500">Última sinc: {lastSyncTime}</p>
                             )}
-                        </button>
-                        
-                        <button 
-                            onClick={() => setShowGoalModal(true)}
-                            className="p-2 bg-slate-800 border border-slate-700/60 rounded-lg text-slate-300 hover:text-white"
-                            title="Meta"
-                        >
-                            <Target size={14} />
-                        </button>
+                            <button
+                                onClick={() => loadPublicSpreadsheet(spreadsheetId)}
+                                disabled={isFetchingSheets}
+                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                            >
+                                <Database size={12} className={isFetchingSheets ? "animate-spin" : ""} />
+                                <span>Sincronizar</span>
+                            </button>
+                        </div>
+                    </div>
 
-                        <button 
-                            onClick={handleExportPDF}
-                            className="p-2 bg-slate-800 border border-slate-700/60 rounded-lg text-emerald-400 hover:bg-slate-700"
-                            title="PDF"
+                    {/* Left Sidebar Footer Toggles */}
+                    <div className="p-4 border-t border-slate-800 space-y-2">
+                        <button
+                            onClick={() => setViewMode('simulator')}
+                            className="w-full py-2 bg-slate-800 hover:bg-slate-700 hover:text-white text-slate-400 font-bold rounded-lg text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
                         >
-                            <FileText size={14} />
+                            <Smartphone size={12} />
+                            <span>Modo Celular</span>
                         </button>
                     </div>
-                </header>
+                </aside>
+
+                {/* 2. Main Area (Right Side) */}
+                <div className="flex-1 flex flex-col overflow-hidden bg-slate-950 relative">
+                    {/* Simulated In-App Top Bar */}
+                    <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 shrink-0 flex items-center justify-between z-10">
+                        <div className="flex items-center gap-2">
+                            {/* Mobile menu trigger */}
+                            <div className="md:hidden p-1.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg text-white shadow">
+                                <Activity size={18} />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-bold text-white tracking-tight leading-none md:hidden">ProdAnalytics</h2>
+                                <h2 className="text-sm font-bold text-white tracking-tight leading-none hidden md:block">
+                                    {{
+                                        overview: 'Visão Geral do Painel',
+                                        quality: 'Qualidade do Tratamento',
+                                        neighborhoods: 'Monitoramento de Bairros',
+                                        teams: 'Equipes de Supervisão',
+                                        hours: 'Banco de Horas Extra',
+                                        more: 'Pendências e Notificações'
+                                    }[activeTab] || 'Dashboard'}
+                                </h2>
+                                <p className="text-[10px] text-slate-400 font-medium mt-1 shrink truncate max-w-[120px] md:max-w-xs">
+                                    {activeFiltersCount > 0 ? `${activeFiltersCount} Filtro(s) ativo(s)` : 'Todos os dados da planilha'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                            <button 
+                                onClick={() => loadPublicSpreadsheet(spreadsheetId)}
+                                disabled={isFetchingSheets}
+                                className="md:hidden p-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-850 hover:bg-slate-800 text-slate-300 border-slate-750 disabled:opacity-50"
+                                title="Sincronizar dados"
+                            >
+                                <Database size={14} className={isFetchingSheets ? "animate-spin text-emerald-400" : "text-emerald-400"} />
+                            </button>
+
+                            <button 
+                                onClick={() => setIsFilterSheetOpen(true)}
+                                className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
+                                    activeFiltersCount > 0 
+                                    ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/40 shadow-sm' 
+                                    : 'bg-slate-800 text-slate-300 border-slate-700/60'
+                                }`}
+                            >
+                                <SlidersHorizontal size={14} />
+                                <span className="hidden xs:inline">Filtros</span>
+                                {activeFiltersCount > 0 && (
+                                    <span className="h-4 w-4 rounded-full bg-indigo-500 text-white text-[9px] flex items-center justify-center font-black">
+                                        {activeFiltersCount}
+                                    </span>
+                                )}
+                            </button>
+                            
+                            <button 
+                                onClick={() => setShowGoalModal(true)}
+                                className="p-2 bg-slate-800 border border-slate-700/60 rounded-lg text-slate-300 hover:text-white flex items-center gap-1"
+                                title="Definir Metas"
+                            >
+                                <Target size={14} />
+                                <span className="hidden sm:inline text-xs font-semibold">Definir Metas</span>
+                            </button>
+
+                            <button 
+                                onClick={handleExportPDF}
+                                className="p-2 bg-slate-800 border border-slate-700/60 rounded-lg text-emerald-400 hover:bg-slate-700 flex items-center gap-1"
+                                title="Relatório PDF"
+                            >
+                                <FileText size={14} />
+                                <span className="hidden sm:inline text-xs font-semibold">Relatório PDF</span>
+                            </button>
+                        </div>
+                    </header>
 
                 {/* Filter chip shortcuts bar (horizontal scroll) */}
                 {activeFiltersCount > 0 && (
@@ -679,13 +789,13 @@ export const Dashboard: React.FC = () => {
                 )}
 
                 {/* Core Scrollable Screen Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar pb-24">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar pb-24 md:pb-6">
 
                     {/* --- TAB VIEW 1: OVERVIEW --- */}
                     {activeTab === 'overview' && (
                         <div className="space-y-6 animate-in fade-in duration-300">
-                            {/* KPI Metrics List (Optimized 2-Column Grid on Mobile) */}
-                            <div className="grid grid-cols-2 gap-3.5">
+                            {/* KPI Metrics List (Optimized 2-Column Grid on Mobile, 4-Column Grid on Desktop) */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-sm">
                                     <div className="flex justify-between items-start mb-1 text-slate-500">
                                         <span className="text-[10px] font-bold uppercase tracking-wider">Trabalhados</span>
@@ -723,65 +833,72 @@ export const Dashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Top Perfomer List */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
-                                <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
-                                    <h3 className="font-bold text-slate-200 text-xs flex items-center gap-1.5"><Users size={14} className="text-blue-400"/> Ranking Produtividade</h3>
-                                    <span className="text-[9px] font-medium bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded">Agentes</span>
-                                </div>
-                                <div className="p-2 space-y-1 divide-y divide-slate-800/40">
-                                    {analytics.rankingAgentes.map((agent, idx) => (
-                                        <div 
-                                            key={idx} 
-                                            onClick={() => setSelectedAgent(agent.name)}
-                                            className="flex flex-col p-2.5 hover:bg-slate-800/40 rounded-lg transition-all border border-transparent cursor-pointer"
-                                        >
-                                            <div className="flex justify-between items-center mb-1">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                                                        idx === 0 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' : 
-                                                        idx === 1 ? 'bg-slate-300/10 text-slate-300 border border-slate-300/20' : 
-                                                        idx === 2 ? 'bg-amber-600/10 text-amber-500 border border-amber-500/20' : 
-                                                        'bg-slate-800 text-slate-500 border border-slate-700/80'
-                                                    }`}>
-                                                        {idx + 1}
-                                                    </div>
-                                                    <span className="text-xs font-semibold text-slate-200 tracking-tight truncate max-w-[140px]">{agent.name}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-bold font-mono ${agent.StatusMeta ? 'text-green-400' : 'text-slate-400'}`}>
-                                                        {agent.Trabalhados}
-                                                    </span>
-                                                    <ChevronRight size={14} className="text-slate-600" />
-                                                </div>
-                                            </div>
-                                            <div className="w-full bg-slate-800 rounded-full h-1 mt-1 overflow-hidden">
-                                                <div className={`h-full rounded-full ${agent.StatusMeta ? 'bg-green-500' : 'bg-blue-500'}`} style={{width: `${Math.min(100, (agent.Trabalhados / goals.trabalhados) * 100)}%`}}></div>
-                                            </div>
-                                            <div className="flex justify-between mt-1 text-[9px] text-slate-500">
-                                                <span>Diária: {agent.MediaDiaria}/dia</span>
-                                                <span>Recusas/Fech: {agent.Recusas}/{agent.Fechados}</span>
-                                            </div>
+                            {/* Two-Column Layout on Desktop for List & Chart */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Top Perfomer List */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
+                                            <h3 className="font-bold text-slate-200 text-xs flex items-center gap-1.5"><Users size={14} className="text-blue-400"/> Ranking Produtividade</h3>
+                                            <span className="text-[9px] font-medium bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded">Agentes</span>
                                         </div>
-                                    ))}
+                                        <div className="p-2 space-y-1 divide-y divide-slate-800/40 max-h-[420px] overflow-y-auto custom-scrollbar">
+                                            {analytics.rankingAgentes.map((agent, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    onClick={() => setSelectedAgent(agent.name)}
+                                                    className="flex flex-col p-2.5 hover:bg-slate-800/40 rounded-lg transition-all border border-transparent cursor-pointer"
+                                                >
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                                                                idx === 0 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' : 
+                                                                idx === 1 ? 'bg-slate-300/10 text-slate-300 border border-slate-300/20' : 
+                                                                idx === 2 ? 'bg-amber-600/10 text-amber-500 border border-amber-500/20' : 
+                                                                'bg-slate-800 text-slate-500 border border-slate-700/80'
+                                                            }`}>
+                                                                {idx + 1}
+                                                            </div>
+                                                            <span className="text-xs font-semibold text-slate-200 tracking-tight truncate max-w-[140px]">{agent.name}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-xs font-bold font-mono ${agent.StatusMeta ? 'text-green-400' : 'text-slate-400'}`}>
+                                                                {agent.Trabalhados}
+                                                            </span>
+                                                            <ChevronRight size={14} className="text-slate-600" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-full bg-slate-800 rounded-full h-1 mt-1 overflow-hidden">
+                                                        <div className={`h-full rounded-full ${agent.StatusMeta ? 'bg-green-500' : 'bg-blue-500'}`} style={{width: `${Math.min(100, (agent.Trabalhados / goals.trabalhados) * 100)}%`}}></div>
+                                                    </div>
+                                                    <div className="flex justify-between mt-1 text-[9px] text-slate-500">
+                                                        <span>Diária: {agent.MediaDiaria}/dia</span>
+                                                        <span>Recusas/Fech: {agent.Recusas}/{agent.Fechados}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Lost visits Chart on Mobile (horizontal scrolling canvas container) */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-                                <h3 className="font-bold text-slate-200 text-xs mb-4">Métricas de Perda (Top 10 Agentes)</h3>
-                                <div className="w-full h-56 text-xs text-slate-400">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={analytics.rankingAgentes.slice(0, 10)} margin={{top: 5, right: 0, left: -25, bottom: 5}} barSize={8}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
-                                            <XAxis dataKey="name" tick={{fontSize: 9, fill: CHART_TEXT_COLOR}} interval={0} angle={-35} textAnchor="end" height={40} />
-                                            <YAxis tick={{fontSize: 9, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
-                                            <Tooltip content={<CustomBarTooltip />} cursor={{fill: '#1e293b'}} />
-                                            <Bar dataKey="Trabalhados" stackId="a" fill={COLORS.blue} />
-                                            <Bar dataKey="Fechados" stackId="a" fill={COLORS.yellow} />
-                                            <Bar dataKey="Recusas" stackId="a" fill={COLORS.red} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                                {/* Lost visits Chart */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex flex-col justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-slate-200 text-xs mb-4">Métricas de Perda (Top 10 Agentes)</h3>
+                                        <div className="w-full h-80 text-xs text-slate-400">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={analytics.rankingAgentes.slice(0, 10)} margin={{top: 5, right: 0, left: -25, bottom: 5}} barSize={10}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+                                                    <XAxis dataKey="name" tick={{fontSize: 9, fill: CHART_TEXT_COLOR}} interval={0} angle={-35} textAnchor="end" height={55} />
+                                                    <YAxis tick={{fontSize: 9, fill: CHART_TEXT_COLOR}} axisLine={false} tickLine={false} />
+                                                    <Tooltip content={<CustomBarTooltip />} cursor={{fill: '#1e293b'}} />
+                                                    <Bar dataKey="Trabalhados" stackId="a" fill={COLORS.blue} />
+                                                    <Bar dataKey="Fechados" stackId="a" fill={COLORS.yellow} />
+                                                    <Bar dataKey="Recusas" stackId="a" fill={COLORS.red} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -791,8 +908,8 @@ export const Dashboard: React.FC = () => {
                     {/* --- TAB VIEW 2: QUALITY / SAÚDE --- */}
                     {activeTab === 'quality' && (
                         <div className="space-y-6 animate-in fade-in duration-300">
-                            {/* Mobile KPI list */}
-                            <div className="space-y-3">
+                            {/* Responsive KPI grid: 3-Column on Desktop */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex justify-between items-center">
                                     <div>
                                         <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Imóveis Tratados</p>
@@ -827,39 +944,46 @@ export const Dashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Deposits chart */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-                                <h3 className="font-bold text-slate-200 text-xs mb-4">Tipos de Depósitos Identificados</h3>
-                                <div className="w-full h-52 text-xs">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={analytics.chartDepositos} margin={{left: -25}}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
-                                            <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
-                                            <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
-                                            <Bar dataKey="value" fill={COLORS.orange} radius={[2,2,0,0]} name="Qtd" barSize={15} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            {/* Property Division list */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-                                <h3 className="font-bold text-slate-200 text-xs mb-4">Tipos de Imóveis</h3>
-                                <div className="space-y-2">
-                                    {analytics.chartImoveis.map((item, idx) => (
-                                        <div key={item.name} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-800/60 bg-slate-950/40">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-3 h-3 rounded-full" style={{backgroundColor: Object.values(COLORS)[idx % Object.values(COLORS).length]}}></div>
-                                                <span className="text-xs font-semibold text-slate-200">
-                                                    {{ 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' }[item.name] || item.name}
-                                                </span>
-                                            </div>
-                                            <span className="font-mono text-xs font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                                                {item.value.toLocaleString()}
-                                            </span>
+                            {/* Responsive double-column grid for charts on desktop */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Deposits chart */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex flex-col justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-slate-200 text-xs mb-4">Tipos de Depósitos Identificados</h3>
+                                        <div className="w-full h-64 text-xs">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={analytics.chartDepositos} margin={{left: -25}}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+                                                    <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                                    <YAxis tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                                    <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
+                                                    <Bar dataKey="value" fill={COLORS.orange} radius={[2,2,0,0]} name="Qtd" barSize={15} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
                                         </div>
-                                    ))}
+                                    </div>
+                                </div>
+
+                                {/* Property Division list */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex flex-col justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-slate-200 text-xs mb-4">Tipos de Imóveis</h3>
+                                        <div className="space-y-2 max-h-[260px] overflow-y-auto custom-scrollbar">
+                                            {analytics.chartImoveis.map((item, idx) => (
+                                                <div key={item.name} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-800/60 bg-slate-950/40">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-3 h-3 rounded-full" style={{backgroundColor: Object.values(COLORS)[idx % Object.values(COLORS).length]}}></div>
+                                                        <span className="text-xs font-semibold text-slate-200">
+                                                            {{ 'R': 'Residencial', 'Tb': 'Terreno Baldio', 'PE': 'Ponto Estratégico', 'O': 'Outros' }[item.name] || item.name}
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-mono text-xs font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                                        {item.value.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -879,7 +1003,7 @@ export const Dashboard: React.FC = () => {
                             <p className="text-[10px] text-slate-500 mt-1 italic font-medium">Toque nos bairros para ver o detalhamento de imóveis visitados.</p>
 
                             {/* Neighborhood cards feed */}
-                            <div className="space-y-2.5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {analytics.neighborhoods.map((b, idx) => {
                                     const isExpanded = !!expandedNeighborhoods[b.name];
                                     return (
@@ -959,46 +1083,53 @@ export const Dashboard: React.FC = () => {
                     {/* --- TAB VIEW 4: TEAMS --- */}
                     {activeTab === 'teams' && (
                         <div className="space-y-6 animate-in fade-in duration-300">
-                            {/* Supervisor Productivity metrics list */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-                                <h3 className="font-bold text-slate-200 text-xs mb-4">Supervisores: Média Visitas por Agente</h3>
-                                <div className="w-full h-60 text-xs">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={analytics.rankingSupervisores} margin={{left: -25}}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
-                                            <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
-                                            <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
-                                            <Bar dataKey="MediaPorAgente" radius={[4,4,0,0]} name="Média por Agente" barSize={34}>
-                                                {analytics.rankingSupervisores.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.name === filters.supervisor ? COLORS.orange : COLORS.purple} />
-                                                ))}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            {/* Numerical Supervisor Roster */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-                                <div className="p-4 border-b border-slate-800 bg-slate-800/10">
-                                    <h4 className="text-xs font-bold text-slate-200">Rendimento de Equipes</h4>
-                                </div>
-                                <div className="p-2.5 space-y-2">
-                                    {analytics.rankingSupervisores.map((row, idx) => (
-                                        <div key={idx} className="bg-slate-950/40 border border-slate-800/55 p-3 rounded-xl flex justify-between items-center">
-                                            <div className="space-y-0.5">
-                                                <h5 className="text-xs font-bold text-slate-200">{row.name}</h5>
-                                                <p className="text-[10px] text-slate-500 font-medium">
-                                                    Agentes Ativos: <span className="font-bold text-slate-400">{row.Agentes.size || row.Agentes.length}</span>
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase block leading-tight">Média / Agente</span>
-                                                <span className="font-mono text-sm font-black text-indigo-400">{row.MediaPorAgente} vis.</span>
-                                            </div>
+                            {/* Responsive 2-column layout for supervisor charts & lists */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Supervisor Productivity metrics list */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex flex-col justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-slate-200 text-xs mb-4">Supervisores: Média Visitas por Agente</h3>
+                                        <div className="w-full h-72 text-xs">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={analytics.rankingSupervisores} margin={{left: -25}}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+                                                    <XAxis dataKey="name" tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                                    <YAxis tick={{fill: CHART_TEXT_COLOR, fontSize: 10}} axisLine={false} tickLine={false} />
+                                                    <Tooltip cursor={{fill: '#1e293b'}} content={<CustomBarTooltip />} />
+                                                    <Bar dataKey="MediaPorAgente" radius={[4,4,0,0]} name="Média por Agente" barSize={34}>
+                                                        {analytics.rankingSupervisores.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.name === filters.supervisor ? COLORS.orange : COLORS.purple} />
+                                                        ))}
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
                                         </div>
-                                    ))}
+                                    </div>
+                                </div>
+
+                                {/* Numerical Supervisor Roster */}
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <div className="p-4 border-b border-slate-800 bg-slate-800/10">
+                                            <h4 className="text-xs font-bold text-slate-200">Rendimento de Equipes</h4>
+                                        </div>
+                                        <div className="p-2.5 space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                            {analytics.rankingSupervisores.map((row, idx) => (
+                                                <div key={idx} className="bg-slate-950/40 border border-slate-800/55 p-3 rounded-xl flex justify-between items-center">
+                                                    <div className="space-y-0.5">
+                                                        <h5 className="text-xs font-bold text-slate-200">{row.name}</h5>
+                                                        <p className="text-[10px] text-slate-500 font-medium">
+                                                            Agentes Ativos: <span className="font-bold text-slate-400">{row.Agentes.size || row.Agentes.length}</span>
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-[9px] font-bold text-slate-500 uppercase block leading-tight">Média / Agente</span>
+                                                        <span className="font-mono text-sm font-black text-indigo-400">{row.MediaPorAgente} vis.</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1168,8 +1299,8 @@ export const Dashboard: React.FC = () => {
 
                 </div>
 
-                {/* Simulated Fixed Native iOS/Android Bottom Navigation Bar */}
-                <footer className="absolute bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-1.5 flex justify-around items-center z-20">
+                {/* Simulated Fixed Native iOS/Android Bottom Navigation Bar - Hidden on desktop sidebar */}
+                <footer className="md:hidden absolute bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-1.5 flex justify-around items-center z-20">
                     {[
                         { id: 'overview', label: 'Resumo', icon: BarChart2 },
                         { id: 'quality', label: 'Saúde', icon: Droplet },
@@ -1197,6 +1328,8 @@ export const Dashboard: React.FC = () => {
                         </button>
                     ))}
                 </footer>
+
+                </div> {/* Closing tag for right-side container */}
             </div>
         );
     };
