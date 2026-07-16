@@ -83,8 +83,18 @@ export const parseExcelDate = (serial: number | string): { mes: string; dataForm
   if (typeof serial === 'number') {
     // Excel date serial conversion with buffer
     const date = new Date(Math.round((serial - 25569) * 86400 * 1000) + 12 * 3600 * 1000);
-    mes = date.toLocaleString('pt-BR', { month: 'long' });
-    dataFormatada = date.toISOString().split('T')[0];
+    const parsedYear = date.getUTCFullYear();
+    const parsedMonth = date.getUTCMonth(); // 0-indexed
+    const parsedDay = date.getUTCDate();
+    
+    // Swap day and month because Excel/Google Sheets interpreted the Brazilian format DD/MM/YYYY
+    // as US format MM/DD/YYYY for any days 1 to 12.
+    const correctMonth = parsedDay - 1; // 0-indexed (using parsedDay)
+    const correctDay = parsedMonth + 1; // 1-indexed (using parsedMonth)
+    
+    const correctDate = new Date(parsedYear, correctMonth, correctDay);
+    mes = correctDate.toLocaleString('pt-BR', { month: 'long' });
+    dataFormatada = `${parsedYear}-${String(correctMonth + 1).padStart(2, '0')}-${String(correctDay).padStart(2, '0')}`;
   } else if (typeof serial === 'string') {
     const trimmed = serial.trim();
     const ptDateRegex = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/;
@@ -619,13 +629,17 @@ export const fetchPublicGoogleSheetsAllData = async (spreadsheetId: string): Pro
             dateFormatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
             dateISO = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           } else if (typeof cellData.v === 'number') {
-            // Excel serial number
+            // Excel serial number (swap day and month due to locale inversion for day 1-12)
             const dateObj = new Date(Math.round((cellData.v - 25569) * 86400 * 1000) + 12 * 3600 * 1000);
-            const day = dateObj.getDate();
-            const month = dateObj.getMonth() + 1;
-            const year = dateObj.getFullYear();
-            dateFormatted = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
-            dateISO = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const parsedYear = dateObj.getUTCFullYear();
+            const parsedMonth = dateObj.getUTCMonth(); // 0-indexed
+            const parsedDay = dateObj.getUTCDate();
+            
+            const correctMonth = parsedDay - 1; // 0-indexed
+            const correctDay = parsedMonth + 1; // 1-indexed
+            
+            dateFormatted = `${String(correctDay).padStart(2, '0')}/${String(correctMonth + 1).padStart(2, '0')}/${parsedYear}`;
+            dateISO = `${parsedYear}-${String(correctMonth + 1).padStart(2, '0')}-${String(correctDay).padStart(2, '0')}`;
           } else if (cellData.v && (cellData.v instanceof Date || Object.prototype.toString.call(cellData.v) === '[object Date]')) {
             // Date object
             const dateObj = cellData.v;
